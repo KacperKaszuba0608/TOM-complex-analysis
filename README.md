@@ -10,13 +10,15 @@ Kacper Kaszuba $^{1}$, Remigiusz Serwa. Albert J. R. Heck $^{2}$, Agnieszka Chac
 
 # Content 📁
 
-│   .gitattributes <br>
-│   README.md <br>
-│ <br>
-└───code <br>
-        [analysis.Rmd](./code/analysis.Rmd) <br>
-        [plotting.R](./code/plotting.R) <br>
-        [prepare_the_data.R](./code/prepare_the_data.R)
+```
+│   .gitattributes
+│   README.md
+│
+└───code
+        analysis.Rmd
+        plotting.R
+        prepare_the_data.R
+```
 
 # Description
 
