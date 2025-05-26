@@ -10,7 +10,6 @@ Kacper Kaszuba $^{1}$, Remigiusz Serwa. Albert J. R. Heck $^{2}$, Agnieszka Chac
 
 # Content 📁
 
-```
 │   .gitattributes
 │   README.md
 │
@@ -18,7 +17,6 @@ Kacper Kaszuba $^{1}$, Remigiusz Serwa. Albert J. R. Heck $^{2}$, Agnieszka Chac
         [analysis.Rmd](./code/analysis.Rmd)
         [plotting.R](./code/plotting.R)
         [prepare_the_data.R](./code/prepare_the_data.R)
-```
 
 # Description
 
