@@ -1,0 +1,365 @@
+---
+title: "TOM-PD analysis"
+author: "Vanessa Linke, Kacper Kaszuba"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warninggs=FALSE, message = FALSE, fig.align = "center")
+
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(ComplexHeatmap)
+library(ggrepel)
+
+mitocarta <- read.csv("./data/Human.MitoCarta3.0.csv")
+
+set.seed(123)
+
+calculate_NA <- function(df, condition) {
+    # df = data frame with LFQ values
+    
+    # condition = a vector containing the names of samples in factor format. (number of names should be te same like the number of columns in df)
+    
+    if (!is.data.frame(df)) {df <- as.data.frame(df)}
+    
+    if (!is.factor(condition)) {rlang::abort('The condition vector is not a factor!')}
+    
+    if (length(condition) != ncol(df)) {rlang::abort('The length of condition is not the same as number of columns in used data frame!')}
+    
+    conditions_levels <- levels(condition)
+    
+    no_NAs1 <- lapply(conditions_levels, function(i) {
+        columns <- which(condition == i)
+        
+        no_NAs <- apply(df[,columns], 1, function(row) sum(is.na(row)))
+        no_NAs
+    })
+    
+    no_NAs1 <- as.data.frame(no_NAs1)
+    colnames(no_NAs1) <- conditions_levels
+   
+    type_of_missing <- apply(no_NAs1, 1, function(row) {
+        paste(
+            paste('ev:', row[1]),
+            paste('ev-XL:', row[2]),
+            paste('TOM22:', row[3]), 
+            paste('TOM22-XL:', row[4]), sep = '; ' 
+        )
+    })
+    return(cbind.data.frame(no_NAs1, type_of_missing))
+}
+```
+
+# LOAD DATA
+
+```{r load data}
+# Loauding our dataset
+proteingroups <- read.csv(choose.files(), sep = '\t') # 4227 proteins
+
+# extracting the LFQ values from the data
+LFQ <- proteingroups |> select(`Protein`, ends_with("MaxLFQ.Intensity"))
+
+# replace 0 with NA for missing values
+LFQ[(LFQ==0)] <- NA
+
+LFQ[,2:ncol(LFQ)] <- log2(LFQ[,2:ncol(LFQ)])
+
+# save the rest of the data as metadata
+metadata <- proteingroups|>select(`Protein`, which(!colnames(proteingroups) %in% colnames(LFQ)))
+rownames(metadata) <- metadata$`Protein`
+
+# changing column names
+colnames(LFQ) <- gsub('.MaxLFQ.Intensity', '', colnames(LFQ))
+colnames(LFQ)[grep(pattern='^X22', colnames(LFQ))] <- gsub('X22', 'TOM22', colnames(LFQ)[grep(pattern='^X22', colnames(LFQ))])
+```
+
+```{r}
+# assigning miss type
+conditions = factor(c(rep('TOM22', 5),rep('TOM22-XL', 5),rep('ev', 5),rep('ev-XL', 5)))
+no_NAs <- calculate_NA(LFQ[,-1], conditions)
+```
+
+# DATA PREPARATION TO IMPUTATION
+
+```{r}
+calculate_technical_rep <- function(df, prot_names, sample_name = stringr::str_match(colnames(df)[1], '^.*(?=_\\d+$)')) {
+    rownames(df) <- prot_names
+    technical_replicates <- grep('_[10-12]', colnames(df))
+    tech_rep <- paste(sample_name, 'tech.rep', sep='_') # name of the column for mean
+    means <- apply(df[technical_replicates], 1, function(row) {
+        if (all(is.na(row))) {
+            NA
+        } else {
+            mean(row, na.rm = TRUE)
+        }
+    })
+    df <- df |>
+        mutate(!!tech_rep := means) |>  # Dynamically create column using the variable name
+        select(!!tech_rep, which(!colnames(df) %in% colnames(df)[technical_replicates]))  # Exclude technical replicate columns
+    
+    return(df)
+}
+```
+
+```{r}
+# calculate the average of technical replicates 10-12
+LFQ.tom22 <- calculate_technical_rep(LFQ[2:6], LFQ[,1])
+LFQ.tom22.xl <- calculate_technical_rep(LFQ[7:11], LFQ[,1])
+LFQ.ev <- calculate_technical_rep(LFQ[12:16], LFQ[,1])
+LFQ.ev.xl <- calculate_technical_rep(LFQ[17:21], LFQ[,1])
+
+LFQ.new <- cbind.data.frame(LFQ.tom22, LFQ.tom22.xl, LFQ.ev, LFQ.ev.xl)
+
+conditions.new = factor(c(rep('TOM22', 3),rep('TOM22-XL', 3),rep('ev', 3),rep('ev-XL', 3)))
+no_NAs.new <- calculate_NA(LFQ.new, conditions.new)
+
+no_NAs.clean <- no_NAs.new |>
+    mutate(keep = ifelse(no_NAs.new$TOM22 <= 1 & no_NAs.new$`TOM22-XL` <= 1, TRUE, FALSE)) |>
+    filter(keep)
+
+LFQ.clean <- LFQ.new |>
+    mutate(keep = ifelse(no_NAs.new$TOM22 <= 1 & no_NAs.new$`TOM22-XL` <= 1, TRUE, FALSE)) |>
+    filter(keep) # 1601 proteins left
+
+LFQ.clean.info_to_impute <- merge(LFQ.clean, no_NAs.clean, by='row.names')
+LFQ.clean.info_to_impute.long <- LFQ.clean.info_to_impute |>
+    pivot_longer(cols=2:13, names_to = 'Sample', values_to = 'LFQvalue') |>
+    select(Row.names, ev, `ev-XL`, TOM22, `TOM22-XL`, Sample)
+```
+
+# IMPUTATION OF MISSING VALUES
+
+```{r}
+impute_data <- function(df, width = 0.5, downshift = 0.5) {
+  # df = data frame containing filtered 
+  # Assumes missing data (in df) follows a narrowed and downshifted normal distribution
+
+  # Create new column indicating whether the values are imputed 
+  df$imputed = !is.finite(df$LFQvalue)
+
+  # Imputation
+  temp <- df$LFQvalue 
+  temp[!is.finite(temp)] = NA #make sure all non-finite values are really NA
+  temp.sd = width * sd(temp, na.rm = TRUE)   # shrink sd width
+  temp.mean = mean(temp, na.rm = TRUE) - 
+    downshift * sd(temp, na.rm = TRUE)   # shift mean of imputed values
+  n.missing = sum(is.na(temp))
+  temp[is.na(temp)] = rnorm(n.missing, mean = temp.mean, sd = temp.sd)
+    
+  df$LFQvalue <- temp
+    
+  return(df)
+}
+```
+
+```{r}
+# Data preparation
+LFQ.clean_long <- LFQ.clean |>
+    select(-keep,) |>
+    mutate(Protein.IDs = rownames(LFQ.clean)) |>
+    pivot_longer(cols=(1:12), names_to = 'Sample', values_to = 'LFQvalue') |>
+    separate(col =  Sample, into = c("Condition", "XL","rep"), sep = "_", remove = F) |>
+    mutate(rep = ifelse(is.na(rep), XL, rep)) |>
+    mutate(XL = ifelse(XL == "XL", XL, NA)) |>
+    mutate(.before = 1,
+    "Condition" = case_when(
+    stringr::str_detect(Condition, "ev") ~ "empty vector",
+    stringr::str_detect(Condition, "22") ~ "TOMM22-FLAG",
+    TRUE ~ "else"))
+
+# performing imputation
+LFQ.clean.imp <- impute_data(data.frame(LFQ.clean_long))
+
+temp <- merge(LFQ.clean.imp, LFQ.clean.info_to_impute.long, by.x=c('Protein.IDs', 'Sample'), by.y=c('Row.names', 'Sample'))
+
+temp <- merge(temp, LFQ.clean_long[,c(1,2,6)], by.x=c('Protein.IDs', 'Sample'), by.y=c('Protein.IDs', 'Sample'))
+
+temp[temp$ev == 1 & is.na(temp$XL), "LFQvalue.x"] <- temp[temp$ev == 1 & is.na(temp$XL), "LFQvalue.y"]
+
+temp[temp$`ev-XL` == 1 & !is.na(temp$XL), "LFQvalue.x"] <- temp[temp$`ev-XL` == 1 & !is.na(temp$XL), "LFQvalue.y"]
+
+temp[grep('TOM', temp$Sample), "LFQvalue.x"] <- temp[grep('TOM', temp$Sample), "LFQvalue.y"]
+temp[is.na(temp$LFQvalue.x), "imputed"] <- FALSE
+
+LFQ.clean.imp <- temp[,1:7]
+colnames(LFQ.clean.imp)[6] <- 'LFQvalue'
+```
+
+# FOLD CHANGE
+
+```{r}
+means <- LFQ.clean.imp |> 
+    select(-imputed) |>
+    group_by(Condition, XL, Protein.IDs) |>  
+    summarise(mean=mean(LFQvalue, na.rm = TRUE))
+
+means <- pivot_wider(means, names_from = c(Condition, XL), values_from = mean) |>
+  mutate(FC_22_ev = `TOMM22-FLAG_NA` - `empty vector_NA`,
+         FC_22_ev_XL = `TOMM22-FLAG_XL` - `empty vector_XL`,
+         FC_22_22_XL = `TOMM22-FLAG_XL` - `TOMM22-FLAG_NA`
+           )
+
+LFQ.imp_wide <- LFQ.clean.imp |>
+  select(Sample, Protein.IDs, LFQvalue, imputed) |> 
+  pivot_wider(names_from = c(Sample), values_from = c(LFQvalue, imputed)) |>
+  mutate(imputed_ev_na = (imputed_ev_7|imputed_ev_8|imputed_ev_tech.rep)) |>
+  mutate(imputed_22_na = (imputed_TOM22_7|imputed_TOM22_8|imputed_TOM22_tech.rep)) |>
+  mutate(imputed_ev_XL = (imputed_ev_XL_tech.rep|imputed_ev_XL_8|imputed_ev_XL_9)) |>
+  mutate(imputed_22_XL = (imputed_TOM22_XL_tech.rep|imputed_TOM22_XL_8|imputed_TOM22_XL_9)) |>
+  mutate(imputed_XL = (imputed_ev_XL | imputed_22_XL)) |>
+  mutate(imputed_22 = (imputed_22_na | imputed_ev_na)) |>
+  mutate(imputed_any = (imputed_XL | imputed_22 ))
+rownames(LFQ.imp_wide) <- LFQ.imp_wide$Protein.IDs
+
+FC <- merge(means, LFQ.imp_wide)
+
+metadata2 <- merge(metadata, mitocarta, by.x = "Gene", by.y = "Symbol",  all.x = T)
+
+FC <- merge(FC, metadata2, by.x = 'Protein.IDs', by.y = 'Protein')
+
+colnames(FC)[2:3] <- c('TOMM22_XL', 'TOMM22_NA')
+```
+
+# t-TEST
+
+```{r stats}
+ttest <- function(df, grp1, grp2){ 
+  x = df[grp1]
+  y = df[grp2]
+  x = as.numeric((x))
+  y = as.numeric((y))
+  results = t.test(x,y, 
+                   alternative = 'two.sided', #one-sided: 'greater' is x > y
+                   paired = F,
+                   na.action=na.omit) 
+  results$p.value
+}
+
+
+pvalue <- LFQ.imp_wide |>
+  mutate("p_22" = apply(LFQ.imp_wide, 1, ttest, 
+                  grp1=grep('LFQvalue_TOM22_(?!XL)', colnames(LFQ.imp_wide), perl = TRUE), 
+                  grp2=grep('LFQvalue_ev_(?!XL)', colnames(LFQ.imp_wide), perl = TRUE))) |>
+  mutate("p_22_XL" = apply(LFQ.imp_wide, 1, ttest, 
+                  grp1=grep("LFQvalue_TOM22_XL_", colnames(LFQ.imp_wide)), 
+                  grp2=grep("LFQvalue_ev_XL_", colnames(LFQ.imp_wide))))  |>
+  mutate("p_22_22_XL" = apply(LFQ.imp_wide, 1, ttest, 
+                  grp1=grep("LFQvalue_TOM22_XL_", colnames(LFQ.imp_wide)), 
+                  grp2=grep("LFQvalue_TOM22_(?!XL)", colnames(LFQ.imp_wide), perl = TRUE)))
+```
+
+
+# 1st PREPARING DATA TO PLOT
+
+```{r data prep to plot}
+label.cutoff <- 23
+
+tim23 <- c("TIMM17A", "TIMM17B", "TIMM23", "TIMM50", "ROMO1", "TIMM21", "TIMM44", "DNAJC19", "PAM16", "HSPA9", "GRPEL1", "GRPEL2", "CORO7;PAM16")
+
+tom <- c("TOMM22", "TOMM40", "TOMM40L", "TOMM20", "TOMM5", "TOMM6", "TOMM7", "TOMM70")
+                 
+interactors <- c("ATAD1", "PTRH2", "TRABD", "MUL1", "BAG2", "FKBP8", "VDAC1", "VDAC2", "VDAC3", 
+                 "MARCHF5", "FAF2", "USP30")
+
+tim22 <- c("TIMM22", "TIMM8A", "TIMM9", "TIMM10", "TIMM10B", "AGK", "C19orf52", "TIMM8B", "TIMM13")
+
+intense <- FC|> filter((`TOMM22_XL` > 30 | `TOMM22_NA` > 30) & FC_22_ev > 1)|> select(Gene, Protein.IDs)
+curious_XL <- FC|> filter(FC_22_ev_XL > 2 & FC_22_22_XL > 2)|> select(Gene, Protein.IDs)
+
+FC <- FC|> mutate(.before = 1,
+  "mylabel" = case_when(
+    `Gene` %in% tom ~ "TOM",
+    `Gene` %in% interactors ~ "interactors",
+    Protein.IDs %in% curious_XL$Protein.IDs ~ "boosted",
+    TRUE ~ ""))
+```
+
+```{r volcano}
+p.cutoff = 0.01 #set p value cutoff
+FC.cutoff = 2 # set fold change cutoff
+
+label.FC.cutoff <- 3.5
+label.p.cutoff <- 0.05
+
+volcano <- merge(FC, pvalue)
+volcano$sig_22 <- ifelse(abs(volcano$FC_22_ev)>FC.cutoff&
+                        volcano$p_22<p.cutoff,
+                      yes = TRUE, no = FALSE)
+
+volcano$sig_22_XL<- ifelse(abs(volcano$FC_22_ev_XL)>FC.cutoff&
+                        volcano$p_22_XL<p.cutoff,
+                      yes = TRUE, no = FALSE)
+
+volcano$sig_22_22_XL<- ifelse(abs(volcano$FC_22_22_XL)>FC.cutoff&
+                        volcano$p_22_22_XL<p.cutoff,
+                      yes = TRUE, no = FALSE)
+
+volcano$two_reps <- apply(volcano[, grep('LFQvalue_(?!.*_XL).*$', colnames(volcano), perl=TRUE)], 1, 
+                          function(row) { ifelse(any(is.na(row)), 'two_reps', 'complete')})
+volcano$two_reps[volcano$imputed_ev_na == TRUE] <- paste(volcano$two_reps[volcano$imputed_ev_na == TRUE], 'imputed', sep=' & ')
+volcano$two_reps <- gsub('complete & ', '', volcano$two_reps)
+
+volcano$two_reps_XL <- apply(volcano[, grep('LFQvalue_(.*?)_XL', colnames(volcano), perl=TRUE)], 1, 
+                          function(row) { ifelse(any(is.na(row)), 'two_reps', 'complete')})
+volcano$two_reps_XL[volcano$imputed_ev_XL == TRUE] <- paste(volcano$two_reps_XL[volcano$imputed_ev_XL == TRUE], 'imputed', sep=' & ')
+volcano$two_reps_XL <- gsub('complete & ', '', volcano$two_reps_XL)
+
+volcano <- volcano |>
+    mutate(two_reps_NA_XL = ifelse(two_reps == two_reps_XL, 
+                                   two_reps, 
+                                   paste(two_reps, two_reps_XL, sep = ' | ')))
+
+volcano <- volcano |> distinct() #removing duplicates
+```
+
+# SUMMING THE FC
+
+```{r}
+volcano$FC_all <- volcano$FC_22_ev + volcano$FC_22_ev_XL
+volcano$p_all <- sapply(1:nrow(volcano), function(i) {
+    row <- volcano[i, c("p_22", "p_22_XL")]
+    metap::sumlog(as.numeric(row))$p
+})
+
+volcano$sig_all <- volcano$p_all < p.cutoff
+```
+
+# EXPORTING RESULTS
+
+```{r}
+# data to main plots
+volcano |>
+  select(Protein.IDs, Gene, Protein.ID, starts_with("LFQvalue_"), starts_with('TOMM'),
+         starts_with('empty vector'), contains('FC'), starts_with('p_'), starts_with('sig_'), 
+         imputed_any) |>
+  write.csv(file = 'data_to_plot.csv', row.names = FALSE)
+
+# data to boost plot
+only_FC_means <- LFQ.new |>
+    mutate(Protein.IDs = rownames(LFQ.new)) |>
+    pivot_longer(cols=(1:12), names_to = 'Sample', values_to = 'LFQvalue') |>
+    separate(col =  Sample, into = c("Condition", "XL","rep"), sep = "_", remove = F) |>
+    mutate(rep = ifelse(is.na(rep), XL, rep)) |>
+    mutate(XL = ifelse(XL == "XL", XL, NA)) |>
+    mutate(.before = 1,
+    "Condition" = case_when(
+    stringr::str_detect(Condition, "ev") ~ "empty vector",
+    stringr::str_detect(Condition, "22") ~ "TOMM22-FLAG",
+    TRUE ~ "else")) |>
+    group_by(Condition, XL, Protein.IDs) |>  
+    summarise(mean=mean(LFQvalue, na.rm = TRUE))
+
+only_FC_means <- pivot_wider(only_FC_means, names_from = c(Condition, XL), values_from = mean) |>
+  mutate(FC_22_ev = `TOMM22-FLAG_NA` - `empty vector_NA`,
+         FC_22_ev_XL = `TOMM22-FLAG_XL` - `empty vector_XL`,
+         FC_22_22_XL = `TOMM22-FLAG_XL` - `TOMM22-FLAG_NA`
+           )
+
+only_FC <- merge(only_FC_means, metadata, by.x="Protein.IDs", by.y="Protein")
+
+only_FC |>
+  select(Protein.IDs, Gene, starts_with("FC")) |>
+  write.csv("dataset1_only_FC.csv", row.names=FALSE)
+```
