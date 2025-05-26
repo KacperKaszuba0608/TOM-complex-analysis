@@ -6,7 +6,11 @@ Data analysis and visualization for an article:
 Mayra A. Borrero-Landazabal $^{1,5}$, Vanessa Linke $^{1,5}$, Tereza Kadava $^{2}$,, Piotr Draczkowski $^{3,4}$, 
 Kacper Kaszuba $^{1}$, Remigiusz Serwa. Albert J. R. Heck $^{2}$, Agnieszka Chacińska $^{1}$
 
-[Info about authors]
+$^1$ IMol Polish Academy of Sciences, Warsaw, Poland <br>
+$^2$ Utrecht University, Netherlands <br>
+$^3$ Department of Biochemistry and Biophysics, National Bioinformatics Infrastructure Sweden, Science for Life Laboratory, Stockholm University, Solna, Sweden <br>
+$^4$ Department of Synthesis and Chemical Technology of Pharmaceutical Substances, Medical University of Lublin, Lublin, Poland <br>
+$^5$ These authors contributed equal.
 
 # Content 📁
 
