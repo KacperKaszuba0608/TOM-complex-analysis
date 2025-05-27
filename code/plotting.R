@@ -441,8 +441,7 @@ stochiometric_plot <- main_plot +
     label = ifelse(annotate, Gene, '')),
     verbose = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE
   ) + 
-  # scale_shape_manual('Both p-value < 0.05 & at least one FC > 1', 
-  #                    values = c('TRUE' = 16, 'FALSE' = 1), breaks = c(TRUE, FALSE)) +
+  scale_shape_manual('MitoCarta3.0', values = c('mito' = 16, 'other' = 1), breaks = c('mito', 'other')) +
   scale_color_manual("Mito-copies class", values = c(
     "High abundant" = 'orange',
     "Moderate abundant" = "darkgreen",
@@ -453,7 +452,7 @@ stochiometric_plot <- main_plot +
        y = "Log2 FC (TOMM22-FLAG / empty vector) (n=3)",
        x = "Log2 FC (XL-TOMM22-FLAG / XL-empty vector) (n=3)") +
   theme(
-    legend.position = c(.5, .97),
+    legend.position = c(.3, .97),
     legend.justification = c("right", "top"),
     legend.box.just = "left",
     legend.spacing.y = unit(0, "cm"),
