@@ -13,7 +13,7 @@ library(ggplot2)
 library(ComplexHeatmap)
 library(ggrepel)
 
-mitocarta <- read.csv("./data/Human.MitoCarta3.0.csv")
+mitocarta <- read.csv(choose.files())
 
 set.seed(123)
 
@@ -329,12 +329,14 @@ volcano$sig_all <- volcano$p_all < p.cutoff
 # EXPORTING RESULTS
 
 ```{r}
+dir.create("data")
+
 # data to main plots
 volcano |>
   select(Protein.IDs, Gene, Protein.ID, starts_with("LFQvalue_"), starts_with('TOMM'),
          starts_with('empty vector'), contains('FC'), starts_with('p_'), starts_with('sig_'), 
          imputed_any) |>
-  write.csv(file = 'data_to_plot.csv', row.names = FALSE)
+  write.csv(file = './data/data_to_plot.csv', row.names = FALSE)
 
 # data to boost plot
 only_FC_means <- LFQ.new |>
@@ -361,5 +363,5 @@ only_FC <- merge(only_FC_means, metadata, by.x="Protein.IDs", by.y="Protein")
 
 only_FC |>
   select(Protein.IDs, Gene, starts_with("FC")) |>
-  write.csv("dataset1_only_FC.csv", row.names=FALSE)
+  write.csv("./data/dataset1_only_FC.csv", row.names=FALSE)
 ```
