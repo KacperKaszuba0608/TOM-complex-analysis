@@ -26,8 +26,7 @@ mitocop_B <- readxl::read_xlsx('./data/mitocop-dataset_copy.xlsx', sheet = '(B) 
 # Mito-copies per cell Dataset
 
 mitocopies_df <- mitocop_A |>
-  select(`Protein IDs`, `Gene names`, `Simplified protein IDs`, 
-         which(grepl('Mean mito-copies per cell', colnames(mitocop_A))):which(grepl('Cumulative mito-copies', colnames(mitocop_A))))
+  select(`Protein IDs`, `Gene names`, `Simplified protein IDs`, `Log10 mean mito-copies per cell (≥2/3 Reps)`)
 
 # Functional Dataset
 functional_df <- mitocop_B |>
