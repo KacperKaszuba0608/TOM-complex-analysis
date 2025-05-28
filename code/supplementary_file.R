@@ -82,14 +82,24 @@ only_FC <- only_FC |>
   select(-ID1, -Gene, -annotate)
 
 # README
-readme <- data.frame()
+legend <- data.frame("Table_S1_Datasets" = c(
+  "(A) Raw Dataset 1. \n
+  Table containing the raw MS data from Msfragger.",
+  "(B) Raw Dataset 2. \n
+  Table containing the raw MS data from MaxQuant.",
+  "(C) Related to Figures S1C, 2A, 4A, 5B. \n
+  Data used to plot the figures with information from both dataset and additional databases (MitoCarta3.0, MitoCop, HCOP).",
+  "(D) Related to Figure 5C. \n
+  Data based on the Msfragger file containing log2 fold changes and boost of the crosslinked fold change values.",
+  "(E) Related to Figure S3A. \n
+  Data based on the Msfragger file containing and MitoCop mito-copies information."))
 
 # SUPPLEMENTARY TABLE
-list_of_sheets <- list("README" = readme,
-                      "raw_dataset1" = raw_dataset1,
-                      "raw_dataset2" = raw_dataset2,
-                      "combined_dataset" = combined_df,
-                      "Figure_5C_dataset" = only_FC,
-                      "Figure_S3_dataset" = stochiometric_df)
+list_of_sheets <- list("Legend" = legend,
+                      "(A) Raw Dataset 1" = raw_dataset1,
+                      "(B) Raw Dataset 2" = raw_dataset2,
+                      "(C) Combined Dataset" = combined_df,
+                      "(D) Figure 5C dataset" = only_FC,
+                      "(E) Figure S3A dataset" = stochiometric_df)
 
 openxlsx::write.xlsx(list_of_sheets, file = "supplementary_table.xlsx", keepNA=TRUE, na.string='NA')
