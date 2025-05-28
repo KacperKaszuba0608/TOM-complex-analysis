@@ -415,7 +415,9 @@ stochiometric_df <- mitocarta |> filter(UniProt != "0") |>
          ),
          is_significant = ifelse((FC_22_ev > 1 | FC_22_ev_XL > 1) & (p_22 < 0.05 & p_22_XL < 0.05),
                                  TRUE, FALSE),
-         annotate = ifelse(FC_22_ev_XL >= 2.4 & is_significant & mito_copies_class != "Null value", TRUE, FALSE))
+         annotate = ifelse(FC_22_ev_XL >= 2.4 & is_significant & mito_copies_class != "Null value" 
+                           # | Gene %in% c("MUL1", "BAG2")
+                           , TRUE, FALSE))
 
 stochiometric_df |>
   ggplot(aes(x=`Log10 mean mito-copies per cell (≥2/3 Reps)`, colour = MitoCarta3.0_List)) +
@@ -462,7 +464,7 @@ stochiometric_plot <- main_plot +
 stochiometric_plot
 # ggplotly(stochiometric_plot)
 
-ggsave(plot = stochiometric_plot, filename = "updated_plots/xl_vs_nxl_with_mitocopies.png", width = 7, height = 7)
+ggsave(plot = stochiometric_plot, filename = "updated_plots/xl_vs_nxl_with_mitocopies2.png", width = 7, height = 7)
 ggsave(plot = stochiometric_plot, filename = "updated_plots/xl_vs_nxl_with_mitocopies.pdf", width = 7, height = 7)
 
 
