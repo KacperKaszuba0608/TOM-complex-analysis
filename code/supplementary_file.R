@@ -1,9 +1,9 @@
 suppressWarnings(source("prepare_the_data.R"))
-suppressWarnings(source(choose.files()))
+# suppressWarnings(source(choose.files()))
 
 # RAW DATA FRAMES
 raw_dataset1 <- read_tsv("./data/raw_dataset1.tsv", show_col_types = FALSE)
-raw_dataset2 <- read_table("./data/raw_dataset2.txt", show_col_types = FALSE)
+raw_dataset2 <- read.table("./data/raw_dataset2.txt", sep = "\t", header = TRUE, check.names = FALSE)
 
 # COMBINED DATA FRAME
 combined_df <- merge(cleaned_data, dataset2, by.x="dataset2_id", by.y="Protein IDs", all = TRUE) |>
@@ -102,4 +102,4 @@ list_of_sheets <- list("Legend" = legend,
                       "(D) Figure 5C dataset" = only_FC,
                       "(E) Figure S3A dataset" = stochiometric_df)
 
-openxlsx::write.xlsx(list_of_sheets, file = "supplementary_table.xlsx", keepNA=TRUE, na.string='NA')
+openxlsx::write.xlsx(list_of_sheets, file = "supplementary_table_2.xlsx", keepNA=TRUE, na.string='NA')
