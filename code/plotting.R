@@ -81,8 +81,8 @@ combined_plot <- main_plot +
 combined_plot
 # ggplotly(combined_plot)
 
-ggsave(plot = combined_plot, filename = "updated_plots/dataset2_vs_dataset1_plot_colored_by_significant.png", width = 6, height = 6)
-ggsave(plot = combined_plot, filename = "updated_plots/dataset2_vs_dataset1_plot_colored_by_significant.pdf", width = 6, height = 6)
+ggsave(plot = combined_plot, filename = "updated_plots2/dataset2_vs_dataset1_plot_colored_by_significant.png", width = 6, height = 6)
+ggsave(plot = combined_plot, filename = "updated_plots2/dataset2_vs_dataset1_plot_colored_by_significant.pdf", width = 6, height = 6)
 
 ############################# YEAST HOMOLOGS PLOT ##############################
 
@@ -169,8 +169,8 @@ average_plot <- average_df |>
 average_plot
 # ggplotly(average_plot)
 
-ggsave(plot = average_plot, filename = "updated_plots/average_volcano_yeast.png", width = 10, height = 5)
-ggsave(plot = average_plot, filename = "updated_plots/average_volcano_yeast.pdf", width = 10, height = 5)
+ggsave(plot = average_plot, filename = "updated_plots2/average_volcano_yeast.png", width = 10, height = 5)
+ggsave(plot = average_plot, filename = "updated_plots2/average_volcano_yeast.pdf", width = 10, height = 5)
 
 ########################### NON-YEAST HOMOLOGS PLOT ############################
 
@@ -239,7 +239,7 @@ average_plot <- ggplot() +
     nudge_x = 0.8, nudge_y = 0.4
   ) + 
   labs(title = "Figure 4. The human TOM complex interacts with components that do not have yeast homologs.\nA.",
-       x = "AVG Log2 FC (Log2 FC Dataset 1 + Log2 FC Dataset 2) TOMM22-FLAG vs EV (n=3)",
+       x = "AVG Log2 FC (Log2 FC Dataset 1 + Log2 FC Dataset 2) TOMM22-FLAG vs EV (n=6)",
        y = "-log10 p-value") +
   theme(
     legend.position = c(.3, 1.03),
@@ -254,8 +254,8 @@ average_plot <- ggplot() +
 
 average_plot
 
-ggsave(plot = average_plot, filename = "updated_plots/average_volcano_not_yeast.png", width = 10, height = 5)
-ggsave(plot = average_plot, filename = "updated_plots/average_volcano_not_yeast.pdf", width = 10, height = 5)
+ggsave(plot = average_plot, filename = "updated_plots2/average_volcano_not_yeast.png", width = 10, height = 5)
+ggsave(plot = average_plot, filename = "updated_plots2/average_volcano_not_yeast.pdf", width = 10, height = 5)
 
 ##################### CORSSLINKED VS NON-CROSSLINKED PLOT ######################
 small_tims <- c("TIM8B", "TIM13", "T10B", "TIM8A")
@@ -326,8 +326,8 @@ xlvsnxl_plot <- main_plot +
 xlvsnxl_plot
 # ggplotly(xlvsnxl_plot)
 
-ggsave(plot = xlvsnxl_plot, filename = "updated_plots/xl_vs_notxl_plot_with_negative.png", width = 7, height = 7)
-ggsave(plot = xlvsnxl_plot, filename = "updated_plots/xl_vs_notxl_plot_with_negative.pdf", width = 7, height = 7)
+ggsave(plot = xlvsnxl_plot, filename = "updated_plots2/xl_vs_notxl_plot_with_negative.png", width = 7, height = 7)
+ggsave(plot = xlvsnxl_plot, filename = "updated_plots2/xl_vs_notxl_plot_with_negative.pdf", width = 7, height = 7)
 
 ############################### BOOSTED BAR PLOT ###############################
 boost.cutoff <- 1
@@ -395,8 +395,8 @@ boosted_bar_plot <- only_FC_with_mito |>
 boosted_bar_plot
 # ggplotly(boosted_bar_plot, tooltip = c("y", "label"))
 
-ggsave(plot = boosted_bar_plot, filename = "plots/boosted_bar_plot.png", width = 15, height = 10)
-ggsave(plot = boosted_bar_plot, filename = "plots/boosted_bar_plot.pdf", width = 15, height = 10)
+ggsave(plot = boosted_bar_plot, filename = "updated_plots2/boosted_bar_plot.png", width = 15, height = 10)
+ggsave(plot = boosted_bar_plot, filename = "updated_plots2/boosted_bar_plot.pdf", width = 15, height = 10)
 
 ############################## STOCHIOMETRICS PLOT #############################
 
@@ -464,8 +464,8 @@ stochiometric_plot <- main_plot +
 stochiometric_plot
 ggplotly(stochiometric_plot)
 
-ggsave(plot = stochiometric_plot, filename = "updated_plots/xl_vs_nxl_with_mitocopies.png", width = 7, height = 7)
-ggsave(plot = stochiometric_plot, filename = "updated_plots/xl_vs_nxl_with_mitocopies.pdf", width = 7, height = 7)
+ggsave(plot = stochiometric_plot, filename = "updated_plots2/xl_vs_nxl_with_mitocopies.png", width = 7, height = 7)
+ggsave(plot = stochiometric_plot, filename = "updated_plots2/xl_vs_nxl_with_mitocopies.pdf", width = 7, height = 7)
 
 
 ############################## CROSSLINKED VOLCANO #############################
@@ -531,5 +531,5 @@ crosslinked_volcano <- ggplot() +
 crosslinked_volcano
 # ggplotly(crosslinked_volcano)
 
-ggsave(plot = crosslinked_volcano, filename = "updated_plots/crosslinked_volcano_yeast.png", width = 10, height = 5)
-ggsave(plot = crosslinked_volcano, filename = "updated_plots/crosslinked_volcano_yeast.pdf", width = 10, height = 5)
+ggsave(plot = crosslinked_volcano, filename = "updated_plots2/crosslinked_volcano_yeast.png", width = 10, height = 5)
+ggsave(plot = crosslinked_volcano, filename = "updated_plots2/crosslinked_volcano_yeast.pdf", width = 10, height = 5)
