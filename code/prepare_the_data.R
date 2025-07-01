@@ -5,7 +5,11 @@ library(plotly)
 ################################# LOAD DATA ####################################
 rlang::inform("Data Loading...")
 
-data_to_plot <- read_csv('./data/data_to_plot.csv', show_col_types = FALSE) # data to plotting
+data_to_plot <- read_csv('./data/data_to_plot.csv', show_col_types = FALSE) |> # data to plotting
+  mutate(protein_names = sapply(Protein.IDs, function(ID) {
+    ID <- unlist(str_split(ID, "_HUMAN"))[1] |> str_split("\\|") |> unlist()
+    ID[3]
+  }), .after = Protein.IDs)
 
 only_FC <- read.csv('./data/dataset1_only_FC.csv') # data to boost plotting
 
@@ -18,6 +22,25 @@ dataset2 <- read_csv('./data/MB_triplicate_WT_FLAG-TOMM22 vs EV.csv', show_col_t
   mutate(`Data imputed in EV (if <2vv)` = ifelse(`Data imputed in EV (if <2vv)` == 'Yes', TRUE, FALSE),
          Significant_FLAG_EV = ifelse(Significant_FLAG_EV == 'Yes', TRUE, FALSE))
 
+dataset2_supp <- read.table("./data/raw_dataset2.txt", sep = "\t", header = TRUE) |>
+  select(Protein.IDs, Fasta.headers) 
+
+dataset2 <- merge(dataset2, dataset2_supp, by.x = "Protein IDs", by.y = "Protein.IDs", all.x = TRUE) |>
+  mutate(protein_name = sapply(Fasta.headers, function(header) {
+    header <- unlist(str_split(header, "_HUMAN"))[1] |> str_split("\\|") |> unlist()
+    header[3]
+  })) |> 
+  select(-Fasta.headers)
+
+half_lifes <- read_csv("./data/mito-half-lifes.csv", show_col_types = F)
+
+data_to_plot <- merge(data_to_plot, half_lifes, by.x = "Gene", by.y = "Gene Names", all.x = TRUE) |>
+  mutate(halflife_cat = case_when(
+    halflife < 51 ~ 'short',
+    halflife > 176 ~ 'long',
+    TRUE ~ 'medium'
+  ))
+
 ############################### MITOCOP DATASET ################################
 
 mitocop_A <- readxl::read_xlsx('./data/mitocop-dataset_copy.xlsx', sheet = '(A) All protein groups')
@@ -26,7 +49,9 @@ mitocop_B <- readxl::read_xlsx('./data/mitocop-dataset_copy.xlsx', sheet = '(B) 
 # Mito-copies per cell Dataset
 
 mitocopies_df <- mitocop_A |>
-  select(`Protein IDs`, `Gene names`, `Simplified protein IDs`, `Log10 mean mito-copies per cell (≥2/3 Reps)`)
+  select(`Protein IDs`, `Gene names`, `Simplified protein IDs`, `Log10 mean mito-copies per cell (≥2/3 Reps)`, 
+         `Mitochondrial based on all evidence sources`) |>
+  mutate(`Mitochondrial based on all evidence sources` = ifelse(is.na(`Mitochondrial based on all evidence sources`), 'other', 'mito'))
 
 # Functional Dataset
 functional_df <- mitocop_B |>
@@ -77,3 +102,5 @@ cleaned_data <- data_to_plot |>
       return(id)
     }
   }))
+
+cleaned_data <- cleaned_data[-which(duplicated(cleaned_data$protein_names)),]

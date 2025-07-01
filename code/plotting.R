@@ -17,6 +17,7 @@ combined_df <- merge(cleaned_data, dataset2, by.x="dataset2_id", by.y="Protein I
          Log2_enrichment_FLAG_EV = ifelse(FC_22_ev > 2 & is.na(Log2_enrichment_FLAG_EV), -5, Log2_enrichment_FLAG_EV),
          annotate = ifelse(abs(FC_22_ev - Log2_enrichment_FLAG_EV) > 1.5, TRUE, annotate),
          Gene = ifelse(!is.na(Gene), Gene, Gene_names),
+         protein_names = ifelse(!is.na(protein_names), protein_names, protein_name),
          pvalue_dataset2 = 10^-Log10_pvalue_FLAG_EV
   )
 
@@ -61,7 +62,7 @@ combined_plot <- main_plot +
       breaks = c("Both Datasets", "One Dataset", "Not Significant")) +
   geom_text_repel(data = subset(combined_df, annotate), mapping = aes(
     x = FC_22_ev, y = Log2_enrichment_FLAG_EV, color = is_significant,
-    label = ifelse(annotate, Gene, "")),
+    label = protein_names),
     verbose = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE
   ) + 
   labs(title = "Figure S1. High-confidence human TOM interactome.",
@@ -93,7 +94,8 @@ additional_yeast_homologs <- c("HSPA1A", "MTX3", "CYB5R1", "YME1L1", "QIL1", "HS
 combined_df <- merge(cleaned_data, dataset2, by.x="dataset2_id", by.y="Protein IDs", all = TRUE) |>
   mutate(FC_22_ev = ifelse(Log2_enrichment_FLAG_EV > 2 & is.na(FC_22_ev), -5, FC_22_ev),
          Log2_enrichment_FLAG_EV = ifelse(FC_22_ev > 2 & is.na(Log2_enrichment_FLAG_EV), -5, Log2_enrichment_FLAG_EV),
-         Gene = ifelse(!is.na(Gene), Gene, Gene_names)
+         Gene = ifelse(!is.na(Gene), Gene, Gene_names),
+         protein_names = ifelse(!is.na(protein_names), protein_names, protein_name)
   )
 
 genes_to_translate <- unique(c(combined_df$Gene, combined_df$Gene_names))
@@ -149,7 +151,7 @@ average_plot <- average_df |>
     breaks = c("TOM subunits", "has yeast homolog", "other")) +
   theme_classic() +
   geom_text_repel(data = subset(average_df, annotate), mapping = aes(
-    x = avg_fc, y = -log10(p_allmv), color = colors_class, label = Gene),
+    x = avg_fc, y = -log10(p_allmv), color = colors_class, label = protein_names),
     verbose = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE
   ) + 
   labs(title = "A.",
@@ -188,9 +190,12 @@ average_plot <- ggplot() +
     x = avg_fc,
     y = -log10(p_allmv),
     color = functional_class,
+    size = halflife_cat,
     alpha = ifelse(functional_class == "Has yeast homolog", 0.5, 1),
     label = Gene
   )) +
+  scale_size_manual("Half-life (MitoCoP)", values = c(6, 3.5, 2, 3.5),
+                    breaks = c("long", "medium", "short")) +
   scale_color_manual("Functional class (MitoCoP)",
                      values = c(
                        "Amino acid metabolism" = "darkgray",
@@ -229,8 +234,9 @@ average_plot <- ggplot() +
                 "Regulation & signaling", "Other", "Unknown")) +
   theme_classic() +
   geom_text_repel(data = subset(average_func_df, annotate), mapping = aes(
-    x = avg_fc, y = -log10(p_allmv), color = functional_class, label = Gene),
-    verbose = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE
+    x = avg_fc, y = -log10(p_allmv), color = functional_class, label = protein_names),
+    verbose = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE, 
+    nudge_x = 0.8, nudge_y = 0.4
   ) + 
   labs(title = "Figure 4. The human TOM complex interacts with components that do not have yeast homologs.\nA.",
        x = "AVG Log2 FC (Log2 FC Dataset 1 + Log2 FC Dataset 2) TOMM22-FLAG vs EV (n=3)",
@@ -238,8 +244,9 @@ average_plot <- ggplot() +
   theme(
     legend.position = c(.3, 1.03),
     legend.justification = c("right", "top"),
-    legend.box.just = "right",
-    legend.background = element_blank()
+    legend.box.just = "left",
+    legend.background = element_blank(),
+    legend.margin = margin(b=0)
   ) +
   scale_x_continuous(limits = c(-4,10), breaks = c(seq(-2,10,2),FC.cutoff), expand = c(0,0)) +
   scale_y_continuous(breaks = c(seq(0, 8, 2), round(-log10(0.05), 2)), expand = c(0,0)) + 
@@ -286,7 +293,7 @@ xlvsnxl_plot <- main_plot +
   )) +
   geom_text_repel(data = subset(xlvsnxl_DF, annotate), mapping = aes(
     y = FC_22_ev, x = FC_22_ev_XL, color = MitoCarta3.0_SubMitoLocalization,
-    label = ifelse(annotate, Gene, "")),
+    label = protein_names),
     verbose = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE
   ) + 
   labs(title = "Figure 5. Crosslink-amplified immunopurification of human TOM complex.\nB. (Log2 FC_22_ev > 0 and Log2 FC_22_ev_XL > 0)",
@@ -374,7 +381,7 @@ boosted_bar_plot <- only_FC_with_mito |>
   geom_text(aes(
     x = FC_22_ev_XL,
     y = Gene_name,
-    label = paste0(Gene, ": ", FC_boost_percent, "% boosted")
+    label = paste0(Gene_name, ": ", FC_boost_percent, "% boosted")
   ), hjust = -0.25) +
   xlim(0,8) +
   labs(
@@ -393,24 +400,18 @@ ggsave(plot = boosted_bar_plot, filename = "plots/boosted_bar_plot.pdf", width =
 
 ############################## STOCHIOMETRICS PLOT #############################
 
-stochiometric_df <- merge(cleaned_data, mitocopies_df, by.x="mitocopies_id", by.y="Protein IDs") |>
+stochiometric_df <- merge(cleaned_data, mitocopies_df, by.x="mitocopies_id", by.y="Protein IDs", all.x = TRUE) |>
   mutate(`Log10 mean mito-copies per cell (≥2/3 Reps)` = gsub("NaN", NA, `Log10 mean mito-copies per cell (≥2/3 Reps)`),
          `Log10 mean mito-copies per cell (≥2/3 Reps)` = as.numeric(`Log10 mean mito-copies per cell (≥2/3 Reps)`),
-         UniProt = gsub("-\\d", "", Simple_ID, perl = TRUE))
-
-stochiometric_df <- mitocarta |> filter(UniProt != "0") |>
-  fuzzyjoin::fuzzy_right_join(stochiometric_df, by = c("UniProt" = "UniProt"),
-                              match_fun = str_detect) |>
-  mutate(MitoCarta3.0_List = ifelse(is.na(MitoCarta3.0_List), "other", "mito"),
          mito_copies_class = case_when(
-           `Log10 mean mito-copies per cell (≥2/3 Reps)` > 5.8 & MitoCarta3.0_List == "mito" ~ "High abundant",
-           `Log10 mean mito-copies per cell (≥2/3 Reps)` > 5.3 & MitoCarta3.0_List == "other" ~ "High abundant",
+           `Log10 mean mito-copies per cell (≥2/3 Reps)` > 5.8 & `Mitochondrial based on all evidence sources` == "mito" ~ "High abundant",
+           `Log10 mean mito-copies per cell (≥2/3 Reps)` > 5.2 & `Mitochondrial based on all evidence sources` == "other" ~ "High abundant",
            `Log10 mean mito-copies per cell (≥2/3 Reps)` > 5.1 & `Log10 mean mito-copies per cell (≥2/3 Reps)` < 5.8 
-           & MitoCarta3.0_List == "mito" ~ "Moderate abundant",
-           `Log10 mean mito-copies per cell (≥2/3 Reps)` > 4.5 & `Log10 mean mito-copies per cell (≥2/3 Reps)` < 5.3 
-           & MitoCarta3.0_List == "other" ~ "Moderate abundant",
-           `Log10 mean mito-copies per cell (≥2/3 Reps)` < 5.1 & MitoCarta3.0_List == "mito" ~ "Low abundant",
-           `Log10 mean mito-copies per cell (≥2/3 Reps)` < 4.5 & MitoCarta3.0_List == "other" ~ "Low abundant",
+           & `Mitochondrial based on all evidence sources` == "mito" ~ "Moderate abundant",
+           `Log10 mean mito-copies per cell (≥2/3 Reps)` > 4 & `Log10 mean mito-copies per cell (≥2/3 Reps)` < 5.2 
+           & `Mitochondrial based on all evidence sources` == "other" ~ "Moderate abundant",
+           `Log10 mean mito-copies per cell (≥2/3 Reps)` < 5.1 & `Mitochondrial based on all evidence sources` == "mito" ~ "Low abundant",
+           `Log10 mean mito-copies per cell (≥2/3 Reps)` < 4 & `Mitochondrial based on all evidence sources` == "other" ~ "Low abundant",
            TRUE ~ "Null value"
          ),
          is_significant = ifelse((FC_22_ev > 1 | FC_22_ev_XL > 1) & (p_22 < 0.05 & p_22_XL < 0.05),
@@ -420,11 +421,11 @@ stochiometric_df <- mitocarta |> filter(UniProt != "0") |>
                            , TRUE, FALSE))
 
 stochiometric_df |>
-  ggplot(aes(x=`Log10 mean mito-copies per cell (≥2/3 Reps)`, colour = MitoCarta3.0_List)) +
+  ggplot(aes(x=`Log10 mean mito-copies per cell (≥2/3 Reps)`, colour = `Mitochondrial based on all evidence sources`)) +
   geom_density()
 
 stochiometric_df |>
-  filter(MitoCarta3.0_List == "other") |>
+  filter(`Mitochondrial based on all evidence sources` == "mito") |>
   select(`Log10 mean mito-copies per cell (≥2/3 Reps)`) |> summary()
 
 stochiometric_plot <- main_plot +
@@ -433,15 +434,14 @@ stochiometric_plot <- main_plot +
     x = FC_22_ev_XL,
     y = FC_22_ev,
     color = mito_copies_class,
-    shape = MitoCarta3.0_List,
+    shape = `Mitochondrial based on all evidence sources`,
     label = Gene
   )) + 
   geom_text_repel(data = subset(stochiometric_df, annotate), mapping = aes(
-    x = FC_22_ev_XL, y = FC_22_ev, color = mito_copies_class,
-    label = ifelse(annotate, Gene, "")),
+    x = FC_22_ev_XL, y = FC_22_ev, color = mito_copies_class, label = protein_names),
     verbose = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE
   ) + 
-  scale_shape_manual("MitoCarta3.0", values = c("mito" = 16, "other" = 1), breaks = c("mito", "other")) +
+  scale_shape_manual("MitoCop mitochondrial", values = c("mito" = 16, "other" = 1), breaks = c("mito", "other")) +
   scale_color_manual("Mito-copies class", values = c(
     "High abundant" = "orange",
     "Moderate abundant" = "darkgreen",
@@ -462,9 +462,9 @@ stochiometric_plot <- main_plot +
   scale_y_continuous(limits = c(-3, 8), breaks = c(seq(-2,8,2), FC.cutoff))
 
 stochiometric_plot
-# ggplotly(stochiometric_plot)
+ggplotly(stochiometric_plot)
 
-ggsave(plot = stochiometric_plot, filename = "updated_plots/xl_vs_nxl_with_mitocopies2.png", width = 7, height = 7)
+ggsave(plot = stochiometric_plot, filename = "updated_plots/xl_vs_nxl_with_mitocopies.png", width = 7, height = 7)
 ggsave(plot = stochiometric_plot, filename = "updated_plots/xl_vs_nxl_with_mitocopies.pdf", width = 7, height = 7)
 
 
@@ -482,7 +482,7 @@ translated_genes <- translated_genes[-which(duplicated(translated_genes$ensembl)
 crosslinked_df <- cleaned_data |>
   mutate(
     is_yeast_homolog = ifelse(Gene %in% translated_genes$human_symbol 
-                              | Gene %in% mayra_data$Detected_yeast
+                              | Gene %in% dataset2$Detected_yeast
                               | Gene %in% additional_yeast_homologs,
                               TRUE, FALSE),
     colors_class = case_when(
@@ -514,7 +514,7 @@ crosslinked_volcano <- ggplot() +
     "other" = "darkgrey"), 
     breaks = c("TOM subunits", "has yeast homolog", "other")) +
   geom_text_repel(data = subset(crosslinked_df, annotate), 
-                  aes(x = FC_22_ev_XL, y = -log10(p_22_XL), color = colors_class, label = Gene),
+                  aes(x = FC_22_ev_XL, y = -log10(p_22_XL), color = colors_class, label = protein_names),
                   verbose = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE) +
   labs(title = "Crosslinked Volcano",
        y = "-log10 p-value",
@@ -523,7 +523,7 @@ crosslinked_volcano <- ggplot() +
   theme(
     legend.position = c(.2, .95),
     legend.justification = c("right", "top"),
-    legend.box.just = "right"
+    legend.box.just = "left"
   ) +
   scale_x_continuous(limits = c(-7,7), breaks = c(seq(-6,7,2), FC.cutoff, -FC.cutoff), expand = c(0,0)) +
   scale_y_continuous(limits = c(0, 5), breaks = c(seq(1, 5, 1), round(-log10(0.05),2)), expand = c(0,0))
