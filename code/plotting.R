@@ -183,6 +183,13 @@ average_func_df <- merge(average_df, functional_df, by.x = "Gene", by.y = "Gene 
            TRUE ~ functional_class
          ))
 
+average_func_df <- merge(average_func_df, half_lifes, by.x = "Gene", by.y = "Gene names", all.x = TRUE) |>
+  mutate(halflife_cat = case_when(
+    halflife < 51 ~ 'short',
+    halflife > 176 ~ 'long',
+    TRUE ~ 'medium'
+  ))
+
 average_plot <- ggplot() +
   geom_vline(xintercept=c(FC.cutoff), linewidth = 0.2, linetype="dashed", color = "black", alpha=0.5) +
   geom_hline(yintercept=-log10(0.05), linewidth = 0.2, linetype="dashed", color = "black", alpha=0.5) +

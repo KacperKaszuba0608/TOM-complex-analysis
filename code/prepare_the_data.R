@@ -32,19 +32,18 @@ dataset2 <- merge(dataset2, dataset2_supp, by.x = "Protein IDs", by.y = "Protein
   })) |> 
   select(-Fasta.headers)
 
-half_lifes <- read_csv("./data/mito-half-lifes.csv", show_col_types = F)
-
-data_to_plot <- merge(data_to_plot, half_lifes, by.x = "Gene", by.y = "Gene Names", all.x = TRUE) |>
-  mutate(halflife_cat = case_when(
-    halflife < 51 ~ 'short',
-    halflife > 176 ~ 'long',
-    TRUE ~ 'medium'
-  ))
 
 ############################### MITOCOP DATASET ################################
 
 mitocop_A <- readxl::read_xlsx('./data/mitocop-dataset_copy.xlsx', sheet = '(A) All protein groups')
 mitocop_B <- readxl::read_xlsx('./data/mitocop-dataset_copy.xlsx', sheet = '(B) MitoCoP (1,134 genes)')
+
+# Half-lives Dataset
+half_lifes <- mitocop_A |>
+  select(`Protein IDs`, `Gene names`, `Protein half-lives [h]`)
+colnames(half_lifes)[3] <- 'halflife'
+
+half_lifes <- half_lifes[-which(duplicated(half_lifes$`Gene names`)),]
 
 # Mito-copies per cell Dataset
 
