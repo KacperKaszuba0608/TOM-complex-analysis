@@ -27,8 +27,8 @@ The core architecture of the translocase of the outer mitochondrial membrane (TO
 serves as the central entry gate for nuclear-encoded proteins is evolutionarily conserved from
 yeast to human. Here, we define the interactome of the human TOM complex that deals with a
 vastly more complex environment. Encouraged by substantial overlap with known yeast
-homologs, we expanded the interactome to include transient and labile interactors stabilized by&nbsp;a 
-membrane-permeable crosslinker. Mapping of 24 unique inter-protein crosslinks to TOM core
+homologs, we expanded the interactome to include transient and labile interactors stabilized by 
+a&nbsp;membrane-permeable crosslinker. Mapping of 24 unique inter-protein crosslinks to TOM core
 subunits provided structural insight into interaction interfaces. Crosslinking further enhanced
 recovery of peripheral components such as the receptor TOMM70 and several TOM-associated
 quality control factors, including ATAD1, the human homolog of Msp1, recently found to prevent
@@ -53,10 +53,10 @@ human-specific regulatory mechanisms behind the complex human mitochondrial netw
 
 This repository contains the code used to analyze the mass spectrometry data for TOM-PD. Each file is responsible for the following calculations:
 1) The file, **`analysis.Rmd`**, contains the following elements of analysis:
-        - The initial step involves the cleansing of missing data.
-        - Subsequent to this step is the imputation of relative proteins.
-        - The third step is the calculation of the fold change.
-        - The final step is the conducting of a t-test.
+    - The initial step involves the cleansing of missing data.
+    - Subsequent to this step is the imputation of relative proteins.
+    - The third step is the calculation of the fold change.
+    - The final step is the conducting of a t-test.
 2) The **`prepare_the_data.R`** is utilized for the preparation of the results from *1)* to generate the plots that are included in the article.
 3) The **`plotting.R`** is utilized for the purpose of generating a plot.
 4) The **`supplementary_file.R`** combines all of the utilized datasets into a single Excel file.
