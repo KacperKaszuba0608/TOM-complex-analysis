@@ -6,7 +6,7 @@ Data analysis and visualization for an article:
 ## A large-scale map of transient and constituive interactor of human TOM comple enabled by crosslinking
 
 Mayra A. Borrero-Landazabal $^{1,6}$, Vanessa Linke $^{1,6}$, Tereza Kadavá $^{2}$, Zeshi Li $^{3}$, Piotr Draczkowski $^{4,5}$, 
-Kacper Kaszuba\$^{1}$, Remigiusz Serwa $^{1}$, Albert J. R. Heck $^{2*}$, Agnieszka Chacińska $^{1*}$
+Kacper&nbsp;Kaszuba&nbsp;&nbsp;$^{1}$, Remigiusz Serwa $^{1}$, Albert J. R. Heck $^{2*}$, Agnieszka Chacińska $^{1*}$
 
 $^1$ IMol Polish Academy of Sciences, Warsaw, Poland <br>
 $^2$ Biomolecular Mass Spectrometry and Proteomics, Bijvoet Center for Biomolecular 
