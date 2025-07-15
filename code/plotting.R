@@ -133,6 +133,14 @@ average_df <- average_df |>
                            , TRUE, FALSE),
          annotate = ifelse(Gene == "HM13", FALSE, annotate))
 
+prots <- c("MTCH1", "MTCH2", "SAMM50", "MTX1", "MTX2", "MTX3", "MIC19", "MIC25", 
+           "MIC27", "MIC60", "UBP30", "ATAD1", "FAF2", "PTH2", "MARH5", "VDAC1", 
+           "VDAC2", "VDAC3", "FKBP8", "TM40L")
+
+average_df <- average_df |>
+  mutate(annotate1 = ifelse(p_allmv < 0.05 & avg_fc > FC.cutoff, TRUE, FALSE),
+         annotate2 = ifelse(protein_names %in% prots | str_starts(protein_names, "TOM"), TRUE, FALSE))
+
 average_plot <- average_df |>
   ggplot() +
   geom_vline(xintercept=c(FC.cutoff), linewidth = 0.2, linetype="dashed", color = "black", alpha=0.5) +
@@ -150,7 +158,7 @@ average_plot <- average_df |>
     "other" = "darkgrey"), 
     breaks = c("TOM subunits", "has yeast homolog", "other")) +
   theme_classic() +
-  geom_text_repel(data = subset(average_df, annotate), mapping = aes(
+  geom_text_repel(data = subset(average_df, annotate1), mapping = aes(
     x = avg_fc, y = -log10(p_allmv), color = colors_class, label = protein_names),
     verbose = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE
   ) + 
@@ -169,9 +177,8 @@ average_plot <- average_df |>
 average_plot
 # ggplotly(average_plot)
 
-ggsave(plot = average_plot, filename = "updated_plots2/average_volcano_yeast.png", width = 10, height = 5)
-ggsave(plot = average_plot, filename = "updated_plots2/average_volcano_yeast.pdf", width = 10, height = 5)
-
+ggsave(plot = average_plot, filename = "updated_plots2/average_volcano_yeast_new.png", width = 10, height = 8)
+ggsave(plot = average_plot, filename = "updated_plots2/average_volcano_yeast_new.pdf", width = 10, height = 8)
 ########################### NON-YEAST HOMOLOGS PLOT ############################
 
 average_func_df <- merge(average_df, functional_df, by.x = "Gene", by.y = "Gene name", all.x = TRUE) |>
@@ -257,12 +264,14 @@ average_plot <- ggplot() +
   ) +
   scale_x_continuous(limits = c(-4,10), breaks = c(seq(-2,10,2),FC.cutoff), expand = c(0,0)) +
   scale_y_continuous(breaks = c(seq(0, 8, 2), round(-log10(0.05), 2)), expand = c(0,0)) + 
-  guides(alpha = "none")
+  guides(alpha = "none", color = guide_legend(override.aes = list(size = 4)))
 
 average_plot
 
-ggsave(plot = average_plot, filename = "updated_plots2/average_volcano_not_yeast.png", width = 10, height = 5)
-ggsave(plot = average_plot, filename = "updated_plots2/average_volcano_not_yeast.pdf", width = 10, height = 5)
+ggsave(plot = average_plot, filename = "updated_plots3/average_volcano_not_yeast.png", 
+       width = 4*800, height = 4*467, units = "px")
+ggsave(plot = average_plot, filename = "updated_plots3/average_volcano_not_yeast.pdf", 
+       width = 4*800, height = 4*467, units = "px")
 
 ##################### CORSSLINKED VS NON-CROSSLINKED PLOT ######################
 small_tims <- c("TIM8B", "TIM13", "T10B", "TIM8A")
@@ -321,20 +330,21 @@ xlvsnxl_plot <- main_plot +
   scale_shape_manual("Both p-value < 0.05 & at least one FC > 1", 
                      values = c("TRUE" = 16, "FALSE" = 1), breaks = c(TRUE, FALSE)) +
   theme(
-    legend.position = c(.5, .97),
+    legend.position = c(.6, .97),
     legend.justification = c("right", "top"),
     legend.box.just = "left",
     legend.spacing.y = unit(0, "cm"),
     legend.background = element_blank()
   ) +
   scale_x_continuous(limits = c(0, 8), breaks = c(seq(0,8,2), FC.cutoff)) +
-  scale_y_continuous(limits = c(0, 8), breaks = c(seq(2,8,2), FC.cutoff))
+  scale_y_continuous(limits = c(0, 8), breaks = c(seq(2,8,2), FC.cutoff)) +
+  guides(color = guide_legend(override.aes = list(shape = 15, size = 3)))
 
 xlvsnxl_plot
 # ggplotly(xlvsnxl_plot)
 
-ggsave(plot = xlvsnxl_plot, filename = "updated_plots2/xl_vs_notxl_plot_with_negative.png", width = 7, height = 7)
-ggsave(plot = xlvsnxl_plot, filename = "updated_plots2/xl_vs_notxl_plot_with_negative.pdf", width = 7, height = 7)
+ggsave(plot = xlvsnxl_plot, filename = "updated_plots3/xl_vs_notxl_plot_with_negative.png", width = 10, height = 10)
+ggsave(plot = xlvsnxl_plot, filename = "updated_plots3/xl_vs_notxl_plot_with_negative.pdf", width = 10, height = 10)
 
 ############################### BOOSTED BAR PLOT ###############################
 boost.cutoff <- 1
@@ -397,13 +407,14 @@ boosted_bar_plot <- only_FC_with_mito |>
     y = "Proteins, sorted by boost from crosslinking"
   ) +
   theme_classic() +
-  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank())
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank()) +
+  guides(fill = "none")
 
 boosted_bar_plot
 # ggplotly(boosted_bar_plot, tooltip = c("y", "label"))
 
-ggsave(plot = boosted_bar_plot, filename = "updated_plots2/boosted_bar_plot.png", width = 15, height = 10)
-ggsave(plot = boosted_bar_plot, filename = "updated_plots2/boosted_bar_plot.pdf", width = 15, height = 10)
+ggsave(plot = boosted_bar_plot, filename = "updated_plots3/boosted_bar_plot.png", width = 10, height = 12)
+ggsave(plot = boosted_bar_plot, filename = "updated_plots3/boosted_bar_plot.pdf", width = 10, height = 12)
 
 ############################## STOCHIOMETRICS PLOT #############################
 
@@ -424,7 +435,7 @@ stochiometric_df <- merge(cleaned_data, mitocopies_df, by.x="mitocopies_id", by.
          is_significant = ifelse((FC_22_ev > 1 | FC_22_ev_XL > 1) & (p_22 < 0.05 & p_22_XL < 0.05),
                                  TRUE, FALSE),
          annotate = ifelse(FC_22_ev_XL >= 2.4 & is_significant & mito_copies_class != "Null value" 
-                           # | Gene %in% c("MUL1", "BAG2")
+                           | Gene %in% c("TOMM40L")
                            , TRUE, FALSE))
 
 stochiometric_df |>
@@ -469,10 +480,10 @@ stochiometric_plot <- main_plot +
   scale_y_continuous(limits = c(-3, 8), breaks = c(seq(-2,8,2), FC.cutoff))
 
 stochiometric_plot
-ggplotly(stochiometric_plot)
+# ggplotly(stochiometric_plot)
 
-ggsave(plot = stochiometric_plot, filename = "updated_plots2/xl_vs_nxl_with_mitocopies.png", width = 7, height = 7)
-ggsave(plot = stochiometric_plot, filename = "updated_plots2/xl_vs_nxl_with_mitocopies.pdf", width = 7, height = 7)
+ggsave(plot = stochiometric_plot, filename = "updated_plots3/xl_vs_nxl_with_mitocopies.png", width = 10, height = 10)
+ggsave(plot = stochiometric_plot, filename = "updated_plots3/xl_vs_nxl_with_mitocopies.pdf", width = 10, height = 10)
 
 
 ############################## CROSSLINKED VOLCANO #############################
@@ -538,5 +549,5 @@ crosslinked_volcano <- ggplot() +
 crosslinked_volcano
 # ggplotly(crosslinked_volcano)
 
-ggsave(plot = crosslinked_volcano, filename = "updated_plots2/crosslinked_volcano_yeast.png", width = 10, height = 5)
-ggsave(plot = crosslinked_volcano, filename = "updated_plots2/crosslinked_volcano_yeast.pdf", width = 10, height = 5)
+ggsave(plot = crosslinked_volcano, filename = "updated_plots3/crosslinked_volcano_yeast.png", width = 10, height = 5)
+ggsave(plot = crosslinked_volcano, filename = "updated_plots3/crosslinked_volcano_yeast.pdf", width = 10, height = 5)
