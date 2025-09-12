@@ -3,14 +3,14 @@ suppressWarnings(source("prepare_the_data.R"))
 ################################## BASE PLOTS ##################################
 FC.cutoff = 1.5
 
-main_plot <- ggplot(show_legend = FALSE)+
+main_plot <- ggplot()+
   geom_hline(yintercept=FC.cutoff, linewidth = 0.2, linetype="dashed", color = "black", alpha=0.5) +
   geom_hline(yintercept=0, linewidth = 0.2, color = "black", alpha=0.5) +
   geom_vline(xintercept=FC.cutoff, linewidth = 0.2, linetype="dashed", color = "black", alpha=0.5) +
   geom_vline(xintercept=0, linewidth = 0.2, color = "black", alpha=0.5) +
   theme_classic()
 
-######################### DATASET 2 VS DATASET 1 PLOT ##########################
+######################### FIGURE S1 C ##########################
 
 combined_df <- merge(cleaned_data, dataset2, by.x="dataset2_id", by.y="Protein IDs", all = TRUE) |>
   mutate(FC_22_ev = ifelse(Log2_enrichment_FLAG_EV > 2 & is.na(FC_22_ev), -5, FC_22_ev),
@@ -24,13 +24,13 @@ combined_df <- merge(cleaned_data, dataset2, by.x="dataset2_id", by.y="Protein I
 # Calculating confidence interval
 df_to_regression <- subset(combined_df, FC_22_ev != -5 & Log2_enrichment_FLAG_EV != -5)
 model <- lm(Log2_enrichment_FLAG_EV~FC_22_ev, data = df_to_regression)
-
-predictions <- predict(model, newdata = df_to_regression, interval = "confidence")
-
-# Add predictions to new data frame
-df_to_regression$fit <- predictions[, "fit"]
-df_to_regression$lwr <- predictions[, "lwr"]
-df_to_regression$upr <- predictions[, "upr"]
+# 
+# predictions <- predict(model, newdata = df_to_regression, interval = "confidence")
+# 
+# # Add predictions to new data frame
+# df_to_regression$fit <- predictions[, "fit"]
+# df_to_regression$lwr <- predictions[, "lwr"]
+# df_to_regression$upr <- predictions[, "upr"]
 
 combined_df <- combined_df |>
   mutate(is_significant = case_when(
@@ -41,13 +41,14 @@ combined_df <- combined_df |>
   annotate = ifelse(FC_22_ev > FC.cutoff & Log2_enrichment_FLAG_EV > FC.cutoff & is_significant == "Both Datasets", TRUE, FALSE))
 
 combined_plot <- main_plot +
-  geom_line(data = df_to_regression, 
-            aes(x = FC_22_ev, y = fit, linetype = paste0("R^2 = ", round(summary(model)$r.squared, 4))),
-            color = "green", size = 1) +
-  geom_ribbon(data = df_to_regression,
-              aes(x = FC_22_ev, ymin = lwr, ymax = upr),
-              alpha = 0.3, fill = "green") +
-  scale_linetype_manual(name = "Linear Regression", values = 1) +
+  geom_abline(slope = 1, intercept = 0, color = "green", size = 1) +
+  # geom_line(data = df_to_regression, 
+  #           aes(x = FC_22_ev, y = fit, linetype = paste0("R^2 = ", round(summary(model)$r.squared, 4))),
+  #           color = "green", size = 1) +
+  # geom_ribbon(data = df_to_regression,
+  #             aes(x = FC_22_ev, ymin = lwr, ymax = upr),
+  #             alpha = 0.3, fill = "green") +
+  # scale_linetype_manual(name = "Linear Regression", values = 1) +
   guides(linetype = guide_legend(override.aes = list(color = "green"))) +
   geom_point(data = subset(combined_df, FC_22_ev >= 0 & Log2_enrichment_FLAG_EV >= 0), aes(
     x = FC_22_ev,
@@ -66,8 +67,9 @@ combined_plot <- main_plot +
     verbose = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE
   ) + 
   labs(title = "Figure S1. High-confidence human TOM interactome.",
-       x = "Dataset 1 Log2 FC (TOMM22-FLAG / empty vector) (n=3)",
-       y = "Dataset 2 Log2 FC (TOMM22-FLAG / empty vector) (n=3)") +
+       subtitle = paste0("R2 = ", round(summary(model)$r.squared, 4)),
+       x = "Dataset 1 Log2 FC TOMM22-FLAG / EV (n=3)",
+       y = "Dataset 2 Log2 FC TOMM22-FLAG / EV (n=3)") +
   theme(
     legend.position = c(.97, .6),
     legend.justification = c("right", "top"),
@@ -81,10 +83,10 @@ combined_plot <- main_plot +
 combined_plot
 # ggplotly(combined_plot)
 
-ggsave(plot = combined_plot, filename = "updated_plots2/dataset2_vs_dataset1_plot_colored_by_significant.png", width = 6, height = 6)
-ggsave(plot = combined_plot, filename = "updated_plots2/dataset2_vs_dataset1_plot_colored_by_significant.pdf", width = 6, height = 6)
+ggsave(plot = combined_plot, filename = "updated_plots4/dataset2_vs_dataset1_plot_colored_by_significant.png", width = 6, height = 6)
+ggsave(plot = combined_plot, filename = "updated_plots4/dataset2_vs_dataset1_plot_colored_by_significant.pdf", width = 6, height = 6)
 
-############################# YEAST HOMOLOGS PLOT ##############################
+############################# FIGURE S2 A ##############################
 
 additional_yeast_homologs <- c("HSPA1A", "MTX3", "CYB5R1", "YME1L1", "QIL1", "HSPA8", 
                                "SAMM50", "RAB13", "MTX2", "MTX1", "MTCH1", "APOOL", 
@@ -179,7 +181,8 @@ average_plot
 
 ggsave(plot = average_plot, filename = "updated_plots2/average_volcano_yeast_new.png", width = 10, height = 8)
 ggsave(plot = average_plot, filename = "updated_plots2/average_volcano_yeast_new.pdf", width = 10, height = 8)
-########################### NON-YEAST HOMOLOGS PLOT ############################
+
+########################### FIGURE 4 B ############################
 
 average_func_df <- merge(average_df, functional_df, by.x = "Gene", by.y = "Gene name", all.x = TRUE) |>
   mutate(annotate = ifelse(!is_yeast_homolog & p_allmv < 0.05 & avg_fc > FC.cutoff | Gene == "PTRH2", TRUE, FALSE),
@@ -273,7 +276,7 @@ ggsave(plot = average_plot, filename = "updated_plots3/average_volcano_not_yeast
 ggsave(plot = average_plot, filename = "updated_plots3/average_volcano_not_yeast.pdf", 
        width = 4*800, height = 4*467, units = "px")
 
-##################### CORSSLINKED VS NON-CROSSLINKED PLOT ######################
+##################### FIGURE 5 A ######################
 small_tims <- c("TIM8B", "TIM13", "T10B", "TIM8A")
 gene_names <- c(
   "TOMM40", "TOMM70", "TOMM5", "TOMM20", "MARCHF5", "VDAC1", "VDAC2", "FKBP8", 
@@ -346,7 +349,7 @@ xlvsnxl_plot
 ggsave(plot = xlvsnxl_plot, filename = "updated_plots3/xl_vs_notxl_plot_with_negative.png", width = 10, height = 10)
 ggsave(plot = xlvsnxl_plot, filename = "updated_plots3/xl_vs_notxl_plot_with_negative.pdf", width = 10, height = 10)
 
-############################### BOOSTED BAR PLOT ###############################
+############################### FIGURE 5 B ###############################
 boost.cutoff <- 1
 FC_XL.cutoff <- 2
 
@@ -416,7 +419,7 @@ boosted_bar_plot
 ggsave(plot = boosted_bar_plot, filename = "updated_plots3/boosted_bar_plot.png", width = 10, height = 12)
 ggsave(plot = boosted_bar_plot, filename = "updated_plots3/boosted_bar_plot.pdf", width = 10, height = 12)
 
-############################## STOCHIOMETRICS PLOT #############################
+############################## FIGURE S5 B #############################
 
 stochiometric_df <- merge(cleaned_data, mitocopies_df, by.x="mitocopies_id", by.y="Protein IDs", all.x = TRUE) |>
   mutate(`Log10 mean mito-copies per cell (≥2/3 Reps)` = gsub("NaN", NA, `Log10 mean mito-copies per cell (≥2/3 Reps)`),
@@ -486,7 +489,7 @@ ggsave(plot = stochiometric_plot, filename = "updated_plots3/xl_vs_nxl_with_mito
 ggsave(plot = stochiometric_plot, filename = "updated_plots3/xl_vs_nxl_with_mitocopies.pdf", width = 10, height = 10)
 
 
-############################## CROSSLINKED VOLCANO #############################
+############################## FIGURE S5 C #############################
 
 additional_yeast_homologs <- c("HSPA1A", "MTX3", "CYB5R1", "YME1L1", "QIL1", "HSPA8", 
                                "SAMM50", "RAB13", "MTX2", "MTX1", "MTCH1", "APOOL", 
@@ -551,3 +554,22 @@ crosslinked_volcano
 
 ggsave(plot = crosslinked_volcano, filename = "updated_plots3/crosslinked_volcano_yeast.png", width = 10, height = 5)
 ggsave(plot = crosslinked_volcano, filename = "updated_plots3/crosslinked_volcano_yeast.pdf", width = 10, height = 5)
+
+######################## DIGGING ####
+
+# MOM proteins
+xlvsnxl_DF |>
+  filter(MitoCarta3.0_SubMitoLocalization == "MOM") |>
+  mutate(FC_diff = FC_22_ev_XL - FC_22_ev) |>
+  arrange(FC_diff) |>
+  select(protein_names, FC_22_ev_XL, FC_22_ev, FC_diff) |>
+  View()
+
+# density plots of the p-values
+cleaned_data |>
+  select(starts_with("p_"), -p_all) |>
+  pivot_longer(cols = everything(), names_to = "TYPE", values_to = "p.value") |>
+  ggplot(aes(x = p.value, color = TYPE)) +
+  geom_density(show.legend = FALSE) +
+  facet_wrap(~TYPE, ncol=2) +
+  theme_minimal()
