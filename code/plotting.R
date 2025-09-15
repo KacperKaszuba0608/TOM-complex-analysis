@@ -555,15 +555,44 @@ crosslinked_volcano
 ggsave(plot = crosslinked_volcano, filename = "updated_plots3/crosslinked_volcano_yeast.png", width = 10, height = 5)
 ggsave(plot = crosslinked_volcano, filename = "updated_plots3/crosslinked_volcano_yeast.pdf", width = 10, height = 5)
 
-######################## DIGGING ####
+######################## DIGGING #########################
 
-# MOM proteins
-xlvsnxl_DF |>
-  filter(MitoCarta3.0_SubMitoLocalization == "MOM") |>
-  mutate(FC_diff = FC_22_ev_XL - FC_22_ev) |>
-  arrange(FC_diff) |>
-  select(protein_names, FC_22_ev_XL, FC_22_ev, FC_diff) |>
-  View()
+df_to_digg <- cleaned_data |>
+  select(protein_names, MitoCarta3.0_SubMitoLocalization, starts_with("FC_"), 
+         starts_with("p_"), -contains(".adj"))
+submito_no <- table(df_to_digg$MitoCarta3.0_SubMitoLocalization) |> as.data.frame()
+
+# ratio of non-crosslinked proteins
+ev_22 <- df_to_digg |>
+  filter(p_22 < 0.05, FC_22_ev > 1.5) # keep only significant proteins
+
+ev_22 <- table(ev_22$MitoCarta3.0_SubMitoLocalization) |> as.data.frame()
+
+ev_22 <- merge(submito_no, ev_22, by = "Var1", suffixes = c("_all", "_22"), all.x = TRUE) |>
+  mutate(Freq_22 = replace_na(Freq_22, 0), # replacing NA with 0
+         ratio_22 = round(Freq_22 / Freq_all, 2)) |> # calculating ratios
+  select(Var1, ratio_22)
+
+# ratio of crosslinked proteins
+ev_22_xl <- df_to_digg |>
+  filter(p_22_XL < 0.05 & FC_22_ev_XL > 1.5) # keep only significant proteins
+
+ev_22_xl <- table(ev_22_xl$MitoCarta3.0_SubMitoLocalization) |> as.data.frame()
+
+ev_22_xl <- merge(submito_no, ev_22_xl, by = "Var1", suffixes = c("_all", "_22xl"), all.x = TRUE) |>
+  mutate(Freq_22xl = replace_na(Freq_22xl, 0), # replacing NA with 0
+         ratio_22xl = round(Freq_22xl / Freq_all, 2)) |> # calculating ratios
+  select(Var1, ratio_22xl)
+
+# export results
+ratios <- merge(ev_22, ev_22_xl, by="Var1", all = TRUE)
+colnames(ratios) <- c("MitoCarta3.0_SubMitoLocalization", "ratio 22 [%]", "ratio 22-xl [%]")
+  
+write.csv(ratios, "submitolocalization_RATIOS.csv", row.names = FALSE)
+
+# Auswertung dataset
+
+tom20 <- readxl::read_xlsx("./data/Auswertung PR80 proteingroups.xlsx", sheet = "proteinGroups")
 
 # density plots of the p-values
 cleaned_data |>
