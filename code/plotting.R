@@ -594,6 +594,13 @@ write.csv(ratios, "submitolocalization_RATIOS.csv", row.names = FALSE)
 
 tom20 <- readxl::read_xlsx("./data/Auswertung PR80 proteingroups.xlsx", sheet = "proteinGroups")
 
+tom20_plot <- tom20 |>
+  ggplot(aes(x = `Ratio H/L`, y = `\"-Log T-test p-value\"`)) +
+  geom_point()
+
+tom20_plot
+
+
 # density plots of the p-values
 cleaned_data |>
   select(starts_with("p_"), -p_all) |>
