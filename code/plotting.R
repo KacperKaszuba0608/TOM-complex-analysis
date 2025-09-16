@@ -127,6 +127,8 @@ average_df$p_allmv <- unlist(sapply(1:nrow(average_df), function(i) {
   ifelse(any(is.na(row)), row[which(!is.na(row))], metap::sumlog(as.numeric(row))$p)
 }))
 
+average_df$p_allmv.adj <- p.adjust(average_df$p_allmv, method = 'BH')
+
 average_df <- average_df |>
   mutate(annotate = ifelse(str_detect(Gene, "TOMM") 
                            | str_detect(Gene, "VDAC") 
@@ -590,18 +592,50 @@ colnames(ratios) <- c("MitoCarta3.0_SubMitoLocalization", "ratio 22 [%]", "ratio
   
 write.csv(ratios, "submitolocalization_RATIOS.csv", row.names = FALSE)
 
-# Auswertung dataset
+# Auswertung dataset from Özdemir article
 
 tom20 <- readxl::read_xlsx("./data/Auswertung PR80 proteingroups.xlsx", sheet = "proteinGroups")
 
+toms <- c("TOMM5", "TOMM6", "TOMM20", "TOMM22", "TOMM40", "TOMM70")
+micos <- c("MIC13", "MIC19", "MIC25", "MIC26", "MIC27", "MIC60")
+apoptosis <- c("BAX", "C9orf89", "BBC3", "RAC1", "RAC2")
+quality <- c("MAPL", "USP30", "MARCH5", "ATAD1", "HUWE1")
+new_tom <- c("TRABD", "MARC2")
+
+tom20 <- tom20 |>
+  mutate(classification = case_when(
+    grepl("TOMM", `Gene names`) ~ "TOM",
+    grepl("MIC", `Gene names`) ~ "MICOS",
+    `Gene names` %in% apoptosis ~ "Apoptosis",
+    `Gene names` %in% quality ~ "Quality Control",
+    `Gene names` %in% new_tom ~ "New TOM interactors",
+    TRUE ~ "Others"
+  ),
+  annotate = classification != "Others" & `\"-Log T-test p-value\"` > -log10(0.05),
+  p.value = 10^-`"-Log T-test p-value"`)
+
 tom20_plot <- tom20 |>
-  ggplot(aes(x = `Ratio H/L`, y = `\"-Log T-test p-value\"`)) +
-  geom_point()
+  ggplot(aes(x = log10(`T-test Difference`), y = -log10(p.value), color = classification, label = `Gene names`)) +
+  geom_hline(yintercept = -log10(0.05), lty = 'dashed', color = 'darkgrey') +
+  geom_vline(xintercept = 0, lty = 'dashed', color = 'darkgrey') +
+  geom_point() +
+  scale_color_manual("", values = c(
+    "TOM" = "gold",
+    "MICOS" = "darkblue",
+    "Apoptosis" = "darkgreen",
+    "Quality Control" = "skyblue", 
+    "New TOM interactors" = "purple",
+    "Others" = "lightgrey"
+  ), breaks = c("TOM", "MICOS", "Apoptosis", "Quality Control", "New TOM interactors", "Others")) +
+  geom_text_repel(aes(label = ifelse(annotate, `Gene names`, "")),
+                  verbose = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE) +
+  theme_minimal() +
+  labs(y = "-log10 p-value")
 
 tom20_plot
+plotly::ggplotly(tom20_plot)
 
-
-# density plots of the p-values
+ # density plots of the p-values
 cleaned_data |>
   select(starts_with("p_"), -p_all) |>
   pivot_longer(cols = everything(), names_to = "TYPE", values_to = "p.value") |>
@@ -609,3 +643,18 @@ cleaned_data |>
   geom_density(show.legend = FALSE) +
   facet_wrap(~TYPE, ncol=2) +
   theme_minimal()
+
+# siginificant protein after FDR correction
+sig_avg_df <- average_df[(which(average_df$p_allmv.adj < 0.05)), "Gene"]
+sig_tom20 <- tom20[(which(tom20$p.value < 0.05)), "Gene names"] |> unlist() |> unname()
+
+# Prepare a palette of 3 colors with R colorbrewer:
+venn <- ggvenn::ggvenn(
+  data = list("Our Set" = sig_avg_df,
+              "Their Set" = sig_tom20)
+)
+
+intersect(sig_avg_df, sig_tom20)
+sig_avg_df[-which(sig_avg_df %in% sig_tom20)]
+
+sig_tom20[grepl("TOM", sig_tom20)]
