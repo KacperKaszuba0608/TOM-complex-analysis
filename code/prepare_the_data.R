@@ -72,9 +72,9 @@ rlang::inform("Data Cleaning...")
 cleaned_data <- data_to_plot |>
   filter(!is.na(Protein.IDs)) |>
   distinct() |>
-  mutate(p_22.adj = p.adjust(p_22, method = "BH"),
-  p_22_XL.adj = p.adjust(p_22_XL, method = "BH"),
-  p_22_22_XL.adj = p.adjust(p_22_22_XL, method = "BH"),
+  mutate(p_22.adj = p.adjust(p_22, method = "bonferroni"),
+  p_22_XL.adj = p.adjust(p_22_XL, method = "bonferroni"),
+  p_22_22_XL.adj = p.adjust(p_22_22_XL, method = "bonferroni"),
   annotate = ifelse(
     ((FC_22_ev_XL >= 2.5 & FC_22_ev >= 2.5)) &
       (TOMM22_XL + TOMM22_NA) > 45 | 
