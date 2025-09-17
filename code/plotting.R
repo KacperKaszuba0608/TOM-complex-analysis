@@ -598,16 +598,18 @@ tom20 <- readxl::read_xlsx("./data/Auswertung PR80 proteingroups.xlsx", sheet = 
 
 toms <- c("TOMM5", "TOMM6", "TOMM20", "TOMM22", "TOMM40", "TOMM70")
 micos <- c("MIC13", "MIC19", "MIC25", "MIC26", "MIC27", "MIC60")
-apoptosis <- c("BAX", "C9orf89", "BBC3", "RAC1", "RAC2")
+micos <- HGNChelper::checkGeneSymbols(micos)
+apoptosis <- c("BAX", "C9orf89", "BBC3", "RAC1;RAC2")
 quality <- c("MAPL", "USP30", "MARCH5", "ATAD1", "HUWE1")
+quality2 <- HGNChelper::checkGeneSymbols(quality)
 new_tom <- c("TRABD", "MARC2")
 
 tom20 <- tom20 |>
   mutate(classification = case_when(
     grepl("TOMM", `Gene names`) ~ "TOM",
-    grepl("MIC", `Gene names`) ~ "MICOS",
+    `Gene names` %in% micos$Suggested.Symbol ~ "MICOS",
     `Gene names` %in% apoptosis ~ "Apoptosis",
-    `Gene names` %in% quality ~ "Quality Control",
+    `Gene names` %in% quality2$Suggested.Symbol | `Gene names` %in% quality~ "Quality Control",
     `Gene names` %in% new_tom ~ "New TOM interactors",
     TRUE ~ "Others"
   ),
@@ -615,7 +617,7 @@ tom20 <- tom20 |>
   p.value = 10^-`"-Log T-test p-value"`)
 
 tom20_plot <- tom20 |>
-  ggplot(aes(x = log10(`T-test Difference`), y = -log10(p.value), color = classification, label = `Gene names`)) +
+  ggplot(aes(x = log10(`T-test Difference`), y = -log10(p.value), color = classification)) +
   geom_hline(yintercept = -log10(0.05), lty = 'dashed', color = 'darkgrey') +
   geom_vline(xintercept = 0, lty = 'dashed', color = 'darkgrey') +
   geom_point() +
@@ -630,12 +632,12 @@ tom20_plot <- tom20 |>
   geom_text_repel(aes(label = ifelse(annotate, `Gene names`, "")),
                   verbose = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE) +
   theme_minimal() +
-  labs(y = "-log10 p-value")
+  labs(y = "adjusted -log10 p-value (BH)")
 
 tom20_plot
-plotly::ggplotly(tom20_plot)
 
- # density plots of the p-values
+
+# density plots of the p-values
 cleaned_data |>
   select(starts_with("p_"), -p_all) |>
   pivot_longer(cols = everything(), names_to = "TYPE", values_to = "p.value") |>
@@ -645,16 +647,23 @@ cleaned_data |>
   theme_minimal()
 
 # siginificant protein after FDR correction
-sig_avg_df <- average_df[(which(average_df$p_allmv.adj < 0.05)), "Gene"]
-sig_tom20 <- tom20[(which(tom20$p.value < 0.05)), "Gene names"] |> unlist() |> unname()
+sig_avg_df <- average_df[(which(average_df$p_allmv.adj < 0.01)), "Gene"]
+sig_tom20 <- tom20[(which(tom20$p.value < 0.01)), "Gene names"] |> unlist() |> unname()
+sig_tom20 <- sapply(sig_tom20, function(gene) str_split(gene, ";")) |> unlist()
+sig_tom20 <- HGNChelper::checkGeneSymbols(sig_tom20)$Suggested.Symbol
 
-# Prepare a palette of 3 colors with R colorbrewer:
+# Prepare a Venn Diagram
 venn <- ggvenn::ggvenn(
-  data = list("Our Set" = sig_avg_df,
-              "Their Set" = sig_tom20)
+  data = list("Borrero, Linke et al." = sig_avg_df,
+              "Özdemir et a.l" = sig_tom20),
+  fill_color = c("orange", "grey"),
+  show_percentage = FALSE,
+  text_size = 8,
+  fill_alpha = 0.8,
+  set_name_size = 5
 )
+
+venn
 
 intersect(sig_avg_df, sig_tom20)
 sig_avg_df[-which(sig_avg_df %in% sig_tom20)]
-
-sig_tom20[grepl("TOM", sig_tom20)]
