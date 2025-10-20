@@ -14,7 +14,8 @@ data_to_plot <- read_csv('./data/data_to_plot.csv', show_col_types = FALSE) |> #
 only_FC <- read.csv('./data/dataset1_only_FC.csv') # data to boost plotting
 
 mitocarta <- read.csv('./data/Human.MitoCarta3.0.csv') |> # MitoCarta3.0 dataset
-  select(Symbol, MitoCarta3.0_List, MitoCarta3.0_SubMitoLocalization, MitoCarta3.0_MitoPathways, UniProt)
+  select(Symbol, MitoCarta3.0_List, MitoCarta3.0_SubMitoLocalization, MitoCarta3.0_MitoPathways, UniProt) |>
+  mutate(MitoCarta3.0_SubMitoLocalization = replace_na(MitoCarta3.0_SubMitoLocalization, "Other"))
 
 dataset2 <- read_csv('./data/MB_triplicate_WT_FLAG-TOMM22 vs EV.csv', show_col_types = FALSE) |>
   select(Gene_names, Detected_yeast, Log2_enrichment_FLAG_EV, Log10_pvalue_FLAG_EV,
@@ -72,9 +73,9 @@ rlang::inform("Data Cleaning...")
 cleaned_data <- data_to_plot |>
   filter(!is.na(Protein.IDs)) |>
   distinct() |>
-  mutate(p_22.adj = p.adjust(p_22, method = "bonferroni"),
-  p_22_XL.adj = p.adjust(p_22_XL, method = "bonferroni"),
-  p_22_22_XL.adj = p.adjust(p_22_22_XL, method = "bonferroni"),
+  mutate(p_22.adj = p.adjust(p_22, method = "BH"),
+  p_22_XL.adj = p.adjust(p_22_XL, method = "BH"),
+  p_22_22_XL.adj = p.adjust(p_22_22_XL, method = "BH"),
   annotate = ifelse(
     ((FC_22_ev_XL >= 2.5 & FC_22_ev >= 2.5)) &
       (TOMM22_XL + TOMM22_NA) > 45 | 
