@@ -12,7 +12,7 @@ main_plot <- ggplot()+
 
 ######################### FIGURE S1 C ##########################
 
-combined_df <- merge(cleaned_data, dataset2, by.x="dataset2_id", by.y="Protein IDs", all = TRUE) |>
+combined_df <- merge(cleaned_data, dataset2, by = "UNIPROT", all = TRUE) |>
   mutate(FC_22_ev = ifelse(Log2_enrichment_FLAG_EV > 2 & is.na(FC_22_ev), -5, FC_22_ev),
          Log2_enrichment_FLAG_EV = ifelse(FC_22_ev > 2 & is.na(Log2_enrichment_FLAG_EV), -5, Log2_enrichment_FLAG_EV),
          annotate = ifelse(abs(FC_22_ev - Log2_enrichment_FLAG_EV) > 1.5, TRUE, annotate),
@@ -22,13 +22,13 @@ combined_df <- merge(cleaned_data, dataset2, by.x="dataset2_id", by.y="Protein I
   )
 
 # Calculating confidence interval
-df_to_regression <- subset(combined_df, FC_22_ev != -5 & Log2_enrichment_FLAG_EV != -5)
-model <- lm(Log2_enrichment_FLAG_EV~FC_22_ev, data = df_to_regression)
+df_to_pearson <- subset(combined_df, FC_22_ev != -5 & Log2_enrichment_FLAG_EV != -5)
+corr <- cor(df_to_pearson$FC_22_ev, df_to_pearson$Log2_enrichment_FLAG_EV, method = "pearson") |> round(2)
 
 combined_df <- combined_df |>
   mutate(is_significant = case_when(
-    p_22.adj < 0.05 & pvalue_dataset2 < 0.05 & FC_22_ev > FC.cutoff & Log2_enrichment_FLAG_EV > FC.cutoff ~ "Both Datasets",
-    (p_22.adj < 0.05 & FC_22_ev > FC.cutoff) | (pvalue_dataset2 < 0.05 & Log2_enrichment_FLAG_EV > FC.cutoff)  ~ "One Dataset",
+    p_22 < 0.05 & pvalue_dataset2 < 0.05 & FC_22_ev > FC.cutoff & Log2_enrichment_FLAG_EV > FC.cutoff ~ "Both Datasets",
+    (p_22 < 0.05 & FC_22_ev > FC.cutoff) | (pvalue_dataset2 < 0.05 & Log2_enrichment_FLAG_EV > FC.cutoff)  ~ "One Dataset",
     TRUE ~ "Not Significant"
   ),
   annotate = ifelse(FC_22_ev > FC.cutoff & Log2_enrichment_FLAG_EV > FC.cutoff & is_significant == "Both Datasets", TRUE, FALSE))
@@ -53,7 +53,7 @@ combined_plot <- main_plot +
     verbose = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE
   ) + 
   labs(title = "Figure S1. High-confidence human TOM interactome.",
-       subtitle = paste0("R\u00b2 = ", round(summary(model)$r.squared, 4)),
+       subtitle = paste0("r = ", corr),
        x = "Dataset 1 Log2 FC TOMM22-FLAG / EV (n=3)",
        y = "Dataset 2 Log2 FC TOMM22-FLAG / EV (n=3)") +
   theme(
@@ -68,11 +68,11 @@ combined_plot <- main_plot +
                      labels = c("0", "2", "4", "6", "8", "10", "1.5"), expand = c(0,0)) + 
   guides(color = guide_legend(override.aes = list(lty = NA)))
 
-# combined_plot
-# ggplotly(combined_plot)
+combined_plot
+# plotly::ggplotly(combined_plot)
 
-ggsave(plot = combined_plot, filename = "plots/figure_S1C.png", width = 6, height = 6)
-ggsave(plot = combined_plot, filename = "plots/figure_S1C.pdf", width = 6, height = 6)
+ggsave(plot = combined_plot, filename = "plots/figure_S1Cv2.png", width = 6, height = 6)
+ggsave(plot = combined_plot, filename = "plots/figure_S1Cv2.pdf", width = 6, height = 6)
 
 ############################# FIGURE 2 A ##############################
 
@@ -81,11 +81,12 @@ additional_yeast_homologs <- c("HSPA1A", "MTX3", "CYB5R1", "YME1L1", "QIL1", "HS
                                "IMMT", "CHCHD3", "CHCHD6", "TMEM33", "ATAD1", "FAF2",
                                "USP30", "PTRH2", "RHOT1", "RHOT2", "MTCH2")
 
-combined_df <- merge(cleaned_data, dataset2, by.x="dataset2_id", by.y="Protein IDs", all = TRUE) |>
-  mutate(FC_22_ev = ifelse(Log2_enrichment_FLAG_EV > 2 & is.na(FC_22_ev), -5, FC_22_ev),
-         Log2_enrichment_FLAG_EV = ifelse(FC_22_ev > 2 & is.na(Log2_enrichment_FLAG_EV), -5, Log2_enrichment_FLAG_EV),
-         Gene = ifelse(!is.na(Gene), Gene, Gene_names),
-         protein_names = ifelse(!is.na(protein_names), protein_names, protein_name)
+combined_df <- merge(cleaned_data, dataset2, by = "UNIPROT", all = TRUE) |>
+  mutate(
+    FC_22_ev = ifelse(Log2_enrichment_FLAG_EV > 2 & is.na(FC_22_ev), -5, FC_22_ev),
+    Log2_enrichment_FLAG_EV = ifelse(FC_22_ev > 2 & is.na(Log2_enrichment_FLAG_EV), -5, Log2_enrichment_FLAG_EV),
+    Gene = ifelse(!is.na(Gene), Gene, Gene_names),
+    protein_names = ifelse(!is.na(protein_names), protein_names, protein_name)
   )
 
 genes_to_translate <- unique(c(combined_df$Gene, combined_df$Gene_names))
@@ -124,7 +125,7 @@ average_df <- average_df |>
            p_allmv < 0.05 & avg_fc > 2 ~ "less_transparent",
            TRUE ~ "high_transparent"
          ),
-         annotate = ifelse(protein_names %in% c("FKBP8", "MARH5"), TRUE, annotate))
+         annotate = ifelse(protein_names %in% c("FKBP8", "MARH5", "TM40L"), TRUE, annotate))
 
 average_plot <- average_df |>
   ggplot() +
@@ -151,11 +152,10 @@ average_plot <- average_df |>
     alpha = ifelse(protein_names == "MARH5", "less_transparent", transparency)),
     verbose = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE, point.size = 0.05
   ) + 
-  labs(title = "Figure 2A.",
-       x = "Log2 FC TOMM22-FLAG vs EV (n=6)",
+  labs(x = "Log2 FC TOMM22-FLAG vs EV (n=6)\n Dataset 1 + Dataset 2",
        y = "-log10 adj. p-value") +
   theme(
-    legend.position = c(.2, .95),
+    legend.position = c(.4, .95),
     legend.justification = c("right", "top"),
     legend.box.just = "left",
     legend.spacing.y = unit(0, "cm"),
@@ -168,8 +168,8 @@ average_plot <- average_df |>
 
 # average_plot
 
-ggsave(plot = average_plot, filename = "plots/figure_2A.png", width = 10, height = 5)
-ggsave(plot = average_plot, filename = "plots/figure_2A.pdf", width = 10, height = 5)
+ggsave(plot = average_plot, filename = "plots/figure_2A_v2.png", width = 5, height = 4)
+ggsave(plot = average_plot, filename = "plots/figure_2A_v2.pdf", width = 5, height = 4)
 
 ############################# FIGURE S2 A ##############################
 
@@ -201,11 +201,10 @@ average_plot_v2 <- average_df |>
     alpha = transparency),
     verbose = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE
   ) + 
-  labs(title = "FIGURE S2A.",
-       x = "Log2 FC TOMM22-FLAG vs EV (n=6)",
+  labs(x = "Log2 FC TOMM22-FLAG vs EV (n=6)",
        y = "-log10 adj. p-value") +
   theme(
-    legend.position = c(.2, .95),
+    legend.position = c(.4, .95),
     legend.justification = c("right", "top"),
     legend.box.just = "left",
     legend.spacing.y = unit(0, "cm"),
@@ -216,15 +215,15 @@ average_plot_v2 <- average_df |>
                      labels = c(seq(0, 4, 1), round(-log10(0.05), 2)) |> as.character(), expand = c(0,0)) + 
   guides(alpha = "none")
 
-# average_plot_v2
+average_plot_v2
 # ggplotly(average_plot_v2)
 
-ggsave(plot = average_plot_v2, filename = "plots/figure_S2A.png", width = 10, height = 8)
-ggsave(plot = average_plot_v2, filename = "plots/figure_S2A.pdf", width = 10, height = 8)
+ggsave(plot = average_plot_v2, filename = "plots/figure_S2A_v2.png", width = 5, height = 4)
+ggsave(plot = average_plot_v2, filename = "plots/figure_S2A_v2.pdf", width = 5, height = 4)
 
 ########################### FIGURE 4 B ############################
 
-average_func_df <- merge(average_df, functional_df, by.x = "Gene", by.y = "Gene name", all.x = TRUE) |>
+average_func_df <- merge(average_df, functional_df, by = "UNIPROT", all.x = TRUE) |>
   mutate(annotate = ifelse(!is_yeast_homolog & p_allmv < 0.05 & avg_fc > FC.cutoff | Gene == "PTRH2", TRUE, FALSE),
          functional_class = replace_na(functional_class, "Other"),
          functional_class = case_when(
@@ -304,8 +303,7 @@ average_plot_v3 <- ggplot() +
     verbose = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE, 
     point.size = 0.2
   ) + 
-  labs(title = "Figure 4B.",
-       x = "Log2 FC TOMM22-FLAG vs EV (n=6)",
+  labs(x = "Log2 FC TOMM22-FLAG vs EV (n=6)",
        y = "-log10 adj. p-value") +
   theme(
     legend.position = c(.3,0.98),
@@ -323,84 +321,70 @@ average_plot_v3 <- ggplot() +
 
 # average_plot_v3
 
-ggsave(plot = average_plot_v3, filename = "plots/figure_4B.png", 
+ggsave(plot = average_plot_v3, filename = "plots/figure_4B_v2.png", 
        width = 4*800, height = 4*467, units = "px")
-ggsave(plot = average_plot_v3, filename = "plots/figure_4B.pdf", 
+ggsave(plot = average_plot_v3, filename = "plots/figure_4B_v2.pdf", 
        width = 4*800, height = 4*467, units = "px")
 
 ##################### FIGURE 5 A v2 ######################
-gene_names <- c(
-  "TOMM40", "TOMM70", "TOMM5", "TOMM20", "MARCHF5", "VDAC1", "VDAC2", "FKBP8", 
-  "NDKA", "NME2", "AKAP1", "MCL1", "RAB10", "KIF11", "RIF1", "BAX", "ATAD1", 
-  "DARS2", "SYNJ2BP"
-)
-
-cleaned_data$UniProt <- gsub("-\\d", "", cleaned_data$Simple_ID, perl = TRUE)
-
-xlvsnxl_DF <- mitocarta |> filter(UniProt != "0") |>
-  fuzzyjoin::fuzzy_right_join(cleaned_data, by = c("UniProt" = "UniProt"),
-                              match_fun = str_detect) |>
-  mutate(MitoCarta3.0_SubMitoLocalization = replace_na(MitoCarta3.0_SubMitoLocalization, "Other"),
-         MitoCarta3.0_SubMitoLocalization = case_when(
-           Gene %in% small_tims ~ "IMS",
-           Gene %in% "TRABD" ~ "MOM",
-           MitoCarta3.0_SubMitoLocalization == "unknown" ~ "Other",
-           TRUE ~ MitoCarta3.0_SubMitoLocalization
-         ),
-         is_significant = ifelse((FC_22_ev > 1 | FC_22_ev_XL > 1) & (p_22 < 0.05 & p_22_XL < 0.05),
-                                 TRUE, FALSE),
-         annotate = ifelse(Gene %in% c("PTRH2", "TOMM70") | (FC_22_ev_XL >= 2.4 & is_significant), TRUE, annotate)#,
-         )
-
-# 2nd Version
-tom20 <- readxl::read_xlsx("./data/Auswertung PR80 proteingroups.xlsx", sheet = "proteinGroups") |> 
-  select(`Gene names`, `T-test Difference`, `"-Log T-test p-value"`) |>
-  mutate(Gene_corrected = HGNChelper::checkGeneSymbols(`Gene names`)$Suggested.Symbol)
-
-to_plot <- merge(xlvsnxl_DF, tom20, by.x = "Gene", by.y = "Gene_corrected", all.x = TRUE)
+xlvsnxl_DF <- merge(cleaned_data, tom20, by = "UNIPROT", all.x = TRUE)
 
 xlvsnxl_plot_v2 <- ggplot() +
-  geom_point(data = to_plot, aes(
+  geom_hline(yintercept = 3, color = "grey", linetype = "dashed") +
+  geom_point(data = xlvsnxl_DF, aes(
     x = FC_22_ev_XL,
     y = FC_22_ev,
     color = `T-test Difference`,
     shape = ifelse(is.na(`T-test Difference`), "No", "Yes"),
     label = Gene
   )) +
-  geom_text_repel(data = subset(to_plot, annotate), mapping = aes(
+  geom_text_repel(data = subset(xlvsnxl_DF, annotate), mapping = aes(
     y = FC_22_ev, x = FC_22_ev_XL, color = `T-test Difference`,
     label = protein_names),
     verbose = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE
   ) + 
-  labs(title = "Figure",
-       y = "Log2 FC (TOMM22-FLAG / empty vector) (n=3)",
-       x = "Log2 FC (XL-TOMM22-FLAG / XL-empty vector) (n=3)") +
-  scale_shape_manual("Was detected by Özdemir et al.?", values = c("No" = 1, "Yes" = 16),
+  labs(y = "Log2 FC (TOMM22-FLAG / empty vector) (n=3)\nDataset 4",
+       x = "Log2 FC (XL-TOMM22-FLAG / XL-empty vector) (n=3)\nDataset 4") +
+  scale_shape_manual("Was detected by\n\u00d6zdemir et al.?", values = c("No" = 1, "Yes" = 16),
                      breaks = c("Yes", "No")) +
-  scale_color_gradientn("T-test Diffrence\nÖzdemir et al.", 
+  scale_color_gradientn("T-test Diffrence\n\u00d6zdemir et al.", 
                         colors = c("darkgrey", "darkgrey", "orange", "darkgreen"),
                         values = scales::rescale(c(-2, 0, 2, 4)),
                         na.value = "darkgrey") +
   theme_classic() +
   theme(
-    legend.position = c(.4, .97),
+    legend.position = c(.3, .97),
     legend.justification = c("right", "top"),
     legend.box.just = "left",
     legend.spacing.y = unit(0, "cm"),
     legend.background = element_blank()
   ) +
-  scale_x_continuous(limits = c(0, 8), breaks = seq(0,8,2), expand = c(0,0)) +
-  scale_y_continuous(limits = c(0, 8), breaks = seq(2,8,2), expand = c(0,0))
+  scale_y_continuous(limits = c(-3, 7.5), expand = c(0,0), breaks = c(seq(-2.5, 7.5, 2.5), 3))
 
 # xlvsnxl_plot_v2
 # ggplotly(xlvsnxl_plot_v2)
 
-ggsave(plot = xlvsnxl_plot_v2, filename = "plots/figure_5A_V2.png", width = 10, height = 10)
-ggsave(plot = xlvsnxl_plot_v2, filename = "plots/figure_5A_V2.pdf", width = 10, height = 10)
+xlvsnxl_dens_plot <- ggplot(data = subset(xlvsnxl_DF, `T-test Difference` > 3)) +
+  theme_classic() +
+  geom_hline(yintercept = 3, color = "grey", linetype = "dashed") +
+  geom_density(mapping = aes(y = FC_22_ev), fill = 'orange', alpha = 0.5, color = "orange") +
+  scale_y_continuous(limits = c(-3, 7.5), expand = c(0,0)) +
+  xlab("density\n") +
+  theme(axis.line.y = element_blank(), axis.text.y = element_blank(), 
+        axis.ticks.y = element_blank(), axis.title.y = element_blank())
+
+# xlvsnxl_dens_plot
+
+xlvsnxl_plot <- ggpubr::ggarrange(xlvsnxl_plot_v2, xlvsnxl_dens_plot, ncol = 2, widths = c(4.5,1))
+# xlvsnxl_plot
+
+ggsave(plot = xlvsnxl_plot, filename = "plots/figure_5A_V2.png", width = 8.5, height = 8.5)
+ggsave(plot = xlvsnxl_plot, filename = "plots/figure_5A_V2.pdf", width = 8.5, height = 8.5)
 
 ############################### FIGURE 5 B ###############################
 boost.cutoff <- 1
 FC_XL.cutoff <- 2
+small_tims <- c("TIM8B", "TIM13", "T10B", "TIM8A")
 
 only_FC <- only_FC |>
   mutate(FC_boost = FC_22_ev_XL - FC_22_ev,
@@ -409,7 +393,7 @@ only_FC <- only_FC |>
   separate(Protein.IDs, c("ID1", "Simple_ID", "Gene_name"), sep="\\|") |>
   mutate(Simple_ID = gsub("-\\d+", "", Simple_ID, perl = TRUE),
          Gene_name = gsub("_HUMAN", "", Gene_name)) |>
-  select(-ID1)
+  dplyr::select(-ID1)
 
 only_FC_filtered <- only_FC |>
   filter(FC_boost > boost.cutoff) |>
@@ -451,15 +435,15 @@ boosted_bar_plot <- only_FC_with_mito |>
     x = FC_22_ev_XL,
     y = Gene_name,
     label = paste0(Gene_name, ": ", FC_boost_percent, "% boosted")
-  ), hjust = -0.25) +
-  xlim(0,8) +
+  ), hjust = -0.2) +
+  scale_x_continuous(limits = c(0,8), expand = c(0,0)) +
   labs(
     title = paste0("BAR PLOT OF THE LOG2 FOLD CHANGE BOOST (FC-XL - FC) > ",boost.cutoff," and FC-XL > ", FC_XL.cutoff),
     x = "Log2 FC XL-TOMM22-FLAG / XL-EV",
     y = "Proteins boosted by cross-linking"
   ) +
   theme_classic() +
-  theme(axis.text = element_blank(), axis.ticks = element_blank(), axis.line = element_blank()) +
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(), axis.line.y = element_blank()) +
   guides(fill = "none")
 
 # boosted_bar_plot
@@ -470,9 +454,8 @@ ggsave(plot = boosted_bar_plot, filename = "plots/figure_5B.pdf", width = 10, he
 
 ############################## FIGURE S5 B #############################
 
-stochiometric_df <- merge(cleaned_data, mitocopies_df, by.x="mitocopies_id", by.y="Protein IDs", all.x = TRUE) |>
-  mutate(`Log10 mean mito-copies per cell (≥2/3 Reps)` = gsub("NaN", NA, `Log10 mean mito-copies per cell (≥2/3 Reps)`),
-         `Log10 mean mito-copies per cell (≥2/3 Reps)` = as.numeric(`Log10 mean mito-copies per cell (≥2/3 Reps)`),
+stochiometric_df <- merge(cleaned_data, mitocopies_df, by = "UNIPROT", all.x = TRUE) |>
+  mutate(
          mito_copies_class = case_when(
            `Log10 mean mito-copies per cell (≥2/3 Reps)` > 5.8 & `Mitochondrial based on all evidence sources` == "mito" ~ "High abundant",
            `Log10 mean mito-copies per cell (≥2/3 Reps)` > 5.2 & `Mitochondrial based on all evidence sources` == "other" ~ "High abundant",
@@ -569,8 +552,8 @@ stochiometric_plot <- ggplot() +
 # stochiometric_plot
 # ggplotly(stochiometric_plot)
 
-ggsave(plot = stochiometric_plot, filename = "plots/figure_S5B.png", width = 10, height = 10)
-ggsave(plot = stochiometric_plot, filename = "plots/figure_S5B.pdf", width = 10, height = 10)
+ggsave(plot = stochiometric_plot, filename = "plots/figure_S5B_v2.png", width = 10, height = 10)
+ggsave(plot = stochiometric_plot, filename = "plots/figure_S5B_v2.pdf", width = 10, height = 10)
 
 ############################## FIGURE S5 C #############################
 
@@ -628,12 +611,11 @@ crosslinked_volcano <- ggplot() +
                   aes(x = FC_22_ev_XL, y = -log10(p_22_XL.adj), color = colors_class, 
                       label = protein_names, alpha = transparency),
                   verbose = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE) +
-  labs(title = "Crosslinked Volcano",
-       y = "-log10 adj. p-value",
+  labs(y = "-log10 adj. p-value",
        x = "Log2 FC XL-TOMM22-FLAG / XL-EV (n=3)") +
   guides(alpha="none") +
   theme(
-    legend.position = c(.2, .95),
+    legend.position = c(.3, .97),
     legend.justification = c("right", "top"),
     legend.box.just = "left",
     legend.spacing.y = unit(0, "cm"),
@@ -646,8 +628,8 @@ crosslinked_volcano <- ggplot() +
 # crosslinked_volcano
 # ggplotly(crosslinked_volcano)
 
-ggsave(plot = crosslinked_volcano, filename = "plots/figure_S5C.png", width = 10, height = 5)
-ggsave(plot = crosslinked_volcano, filename = "plots/figure_S5C.pdf", width = 10, height = 5)
+ggsave(plot = crosslinked_volcano, filename = "plots/figure_S5C.png", width = 7, height = 5)
+ggsave(plot = crosslinked_volcano, filename = "plots/figure_S5C.pdf", width = 7, height = 5)
 
 ############ NEW PLOT Dataset1 VS Dataset 2 colored by Özdemir ################
 
@@ -672,10 +654,10 @@ to_plot <- merge(df_d1d2, tom20, by = "Gene_corrected", all.x = TRUE) |>
   mutate(annotate = FC_22_ev > FC.cutoff & Log2_enrichment_FLAG_EV > FC.cutoff)
 
 # Plot
-combined_plot <- main_plot +
+major_4_plot <- main_plot +
   geom_point(data = subset(to_plot, FC_22_ev >= 0 & Log2_enrichment_FLAG_EV >= 0), aes(
     x = FC_22_ev,
-    y = ,
+    y = FC_22_ev_XL,
     color = `T-test Difference`,
     shape = ifelse(is.na(`T-test Difference`), 'No', 'Yes'),
     label = protein_names
@@ -685,9 +667,9 @@ combined_plot <- main_plot +
     label = protein_names), point.size = 0.2,
     verbose = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE
   ) + 
-  scale_shape_manual("Was detected by\nÖzdemir et al.?", values = c("No" = 1, "Yes" = 16),
+  scale_shape_manual("Was detected by\n\u00d6zdemir et al.?", values = c("No" = 1, "Yes" = 16),
                      breaks = c("Yes", "No")) +
-  scale_color_gradientn("T-test Diffrence\nÖzdemir et al.", 
+  scale_color_gradientn("T-test Diffrence\n\u00d6zdemir et al.", 
                         colors = c("darkgrey", "darkgrey", "orange", "darkgreen"),
                         values = scales::rescale(c(-2, 0, 2, 4)),
                         na.value = "darkgrey") +
@@ -704,10 +686,10 @@ combined_plot <- main_plot +
   scale_x_continuous(limits = c(0, 12), breaks = c(0, 2, 4, 6, 8, 10, 12, 1.5), expand = c(0,0)) +
   scale_y_continuous(limits = c(0, 12), breaks = c(0, 2, 4, 6, 8, 10, 12, 1.5), expand = c(0,0))
 
-# combined_plot
+major_4_plot
 
-ggsave(plot = combined_plot, filename = "plots/figure_for_point_major_4.png", width = 6, height = 6)
-ggsave(plot = combined_plot, filename = "plots/figure_for_point_major_4.pdf", width = 6, height = 6)
+ggsave(plot = major_4_plot, filename = "plots/figure_for_point_major_4.png", width = 6, height = 6)
+ggsave(plot = major_4_plot, filename = "plots/figure_for_point_major_4.pdf", width = 6, height = 6)
 
 
 # List of hits
@@ -721,43 +703,47 @@ ggsave(plot = combined_plot, filename = "plots/figure_for_point_major_4.pdf", wi
 
 # Plot 1
 df_to_plot1 <- cleaned_data |>
-  select(protein_names, Gene, FC_22_ev, p_22, p_22.adj) |>
-  mutate(Gene_corrected = HGNChelper::checkGeneSymbols(Gene)$Suggested.Symbol)
+  dplyr::select(protein_names, Gene, FC_22_ev, p_22, p_22.adj, UNIPROT)
 
-df_to_plot1 <- merge(df_to_plot1, tom20, by = "Gene_corrected", all.x = TRUE)
+df_to_plot1 <- merge(df_to_plot1, tom20, by = "UNIPROT")
 
 test1 <- cor.test(~ FC_22_ev + `T-test Difference`, data = df_to_plot1)
 cor1 <- round(test1$estimate, 2)
 
 pear_plot1 <- df_to_plot1 |>
   ggplot() +
+  geom_abline(slope = 1, intercept = 0, color = "blue", linewidth = 1) +
   theme_classic() +
   geom_point(aes(y = FC_22_ev, x = `T-test Difference`)) +
   labs(subtitle = paste0("Pearson corr coef: ", cor1),
        y = "Dataset1 log2 FC TOM22 / EV (n=3)",
-       x = "T-test Difference Ozdemir et al.")
+       x = "T-test Difference \u00d6zdemir et al.") +
+  ylim(-4, 12) +
+  xlim(-4, 12)
 
-pear_plot1
+# pear_plot1
 
 # Plot 2
 df_to_plot2 <- dataset2 |>
-  select(protein_name, Gene_names, Log2_enrichment_FLAG_EV, Log10_pvalue_FLAG_EV) |>
-  mutate(Gene_corrected = HGNChelper::checkGeneSymbols(Gene_names)$Suggested.Symbol)
+  select(protein_name, Gene_names, Log2_enrichment_FLAG_EV, Log10_pvalue_FLAG_EV, UNIPROT)
 
-df_to_plot2 <- merge(df_to_plot2, tom20, by = "Gene_corrected", all.x = TRUE)
+df_to_plot2 <- merge(df_to_plot2, tom20, by = "UNIPROT")
 
 test2 <- cor.test(~ Log2_enrichment_FLAG_EV + `T-test Difference`, data = df_to_plot2)
 cor2 <- round(test2$estimate, 2)
 
 pear_plot2 <- df_to_plot2 |>
   ggplot() +
+  geom_abline(slope = 1, intercept = 0, color = "blue", linewidth = 1) +
   theme_classic() +
   geom_point(aes(y = Log2_enrichment_FLAG_EV, x = `T-test Difference`)) +
   labs(subtitle = paste0("Pearson corr coef: ", cor2),
        y = "Dataset2 log2 FC TOM22 / EV (n=3)",
-       x = "T-test Difference Ozdemir et al.")
+       x = "T-test Difference \u00d6zdemir et al.") +
+  ylim(-4, 12) +
+  xlim(-4, 12)
 
-pear_plot2
+# pear_plot2
 
 # Plot 3
 df_to_plot3 <- combined_df |>
@@ -768,16 +754,19 @@ cor3 <- round(test3$estimate, 2)
 
 pear_plot3 <- df_to_plot3 |>
   ggplot() +
+  geom_abline(slope = 1, intercept = 0, color = "blue", linewidth = 1) +
   theme_classic() +
   geom_point(aes(x = Log2_enrichment_FLAG_EV, y = FC_22_ev)) +
   labs(subtitle = paste0("Pearson corr coef: ", cor3),
        y = "Dataset1 log2 FC TOM22 / EV (n=3)",
-       x = "Dataset2 log2 FC TOM22 / EV (n=3)")
+       x = "Dataset2 log2 FC TOM22 / EV (n=3)") +
+  ylim(-4, 12) +
+  xlim(-4, 12)
 
-pear_plot3
+# pear_plot3
 
 pear_plots <- ggpubr::ggarrange(pear_plot1, pear_plot2, pear_plot3, ncol = 3, nrow = 1)
-pear_plots
+# pear_plots
 
 ggsave("plots/pearson_plots.png", pear_plots, width = 10, height = 5)
 ggsave("plots/pearson_plots.pdf", pear_plots, width = 10, height = 5)
@@ -787,52 +776,85 @@ small_tims <- c("TIM8B", "TIM13", "T10B", "TIM8A")
 
 df_to_digg <- cleaned_data |>
   merge(mitocarta, by.x = "Simple_ID", by.y = "UniProt", all.x = TRUE) |>
-  mutate(MitoCarta3.0_SubMitoLocalization = replace_na(MitoCarta3.0_SubMitoLocalization, "Other"),
-         MitoCarta3.0_SubMitoLocalization = case_when(
+  mutate(MitoCarta3.0_SubMitoLocalization = case_when(
            Gene %in% small_tims ~ "IMS",
            Gene == "TRABD" ~ "MOM",
            TRUE ~ MitoCarta3.0_SubMitoLocalization
          )) |>
   select(protein_names, MitoCarta3.0_SubMitoLocalization, starts_with("FC_"), 
-         starts_with("p_"), -contains(".adj"))
+         starts_with("p_"))
 
 submito_no <- table(df_to_digg$MitoCarta3.0_SubMitoLocalization) |> as.data.frame()
 submito_no_mitocarta <- table(mitocarta$MitoCarta3.0_SubMitoLocalization) |> as.data.frame()
-levels(submito_no_mitocarta$Var1)[levels(submito_no_mitocarta$Var1) == ""] <- "Other"
 submito_no <- merge(submito_no, submito_no_mitocarta, by = "Var1", 
                     suffixes = c("_all", "_mitocarta"), all = TRUE)
 submito_no[is.na(submito_no)] <- 0
 
-# ratio of non-crosslinked proteins
-ev_22 <- df_to_digg |>
-  filter(p_22 < 0.05 & FC_22_ev > 1.5) # keep only significant proteins
-
-ev_22 <- table(ev_22$MitoCarta3.0_SubMitoLocalization) |> as.data.frame()
-
-ev_22 <- merge(submito_no, ev_22, by = "Var1", suffixes = c("", "_22"), all.x = TRUE) |>
-  mutate(Freq = replace_na(Freq, 0), # replacing NA with 0
-         ratio_22 = round(Freq / Freq_all, 2),
-         ratio_22_mitocarta = round(Freq / Freq_mitocarta, 2)) |> # calculating ratios
-  select(Var1, ratio_22, ratio_22_mitocarta)
-
-# ratio of crosslinked proteins
-ev_22_xl <- df_to_digg |>
-  filter(p_22_XL < 0.05 & FC_22_ev_XL > 1.5) # keep only significant proteins
-
-ev_22_xl <- table(ev_22_xl$MitoCarta3.0_SubMitoLocalization) |> as.data.frame()
-
-ev_22_xl <- merge(submito_no, ev_22_xl, by = "Var1", suffixes = c("", "_22xl"), all.x = TRUE) |>
-  mutate(Freq_22xl = replace_na(Freq, 0), # replacing NA with 0
-         ratio_22xl = round(Freq / Freq_all, 2),
-         ratio_22xl_mitocarta = round(Freq / Freq_mitocarta, 2)) |> # calculating ratios
-  select(Var1, ratio_22xl, ratio_22xl_mitocarta)
-
-# export results
-ratios <- merge(ev_22, ev_22_xl, by="Var1", all = TRUE)
-colnames(ratios) <- c("MitoCarta3.0_SubMitoLocalization", "ratio 22 [%]", "ratio 22 [%] (mitocarta)", 
-                      "ratio 22-xl [%]", "ratio 22-xl [%] (mitocarta)")
+calculate_ratio <- function(df, adj = TRUE, save.file = TRUE) {
+  # ratio of non-crosslinked proteins
+  if (adj) {
+    ev_22 <- df_to_digg |>
+      filter(p_22.adj < 0.05 & FC_22_ev > 1.5) # keep only significant proteins
+  } else {
+    ev_22 <- df_to_digg |>
+      filter(p_22 < 0.05 & FC_22_ev > 1.5) # keep only significant proteins
+  }
   
-# write.csv(ratios, "submitolocalization_RATIOS.csv", row.names = FALSE)
+  if (nrow(ev_22) > 0) {
+    ev_22 <- table(ev_22$MitoCarta3.0_SubMitoLocalization) |> as.data.frame()
+    
+    ev_22 <- merge(submito_no, ev_22, by = "Var1", suffixes = c("", "_22"), all.x = TRUE) |>
+      mutate(Freq = replace_na(Freq, 0), # replacing NA with 0
+             ratio_22 = round(Freq / Freq_all, 2),
+             ratio_22_mitocarta = round(Freq / Freq_mitocarta, 2)) |> # calculating ratios
+      select(Var1, ratio_22, ratio_22_mitocarta)
+  }
+  
+  # ratio of crosslinked proteins
+  if (adj) {
+    ev_22_xl <- df_to_digg |>
+      filter(p_22_XL.adj < 0.05 & FC_22_ev_XL > 1.5) # keep only significant proteins
+  } else {
+    ev_22_xl <- df_to_digg |>
+      filter(p_22_XL < 0.05 & FC_22_ev_XL > 1.5) # keep only significant proteins
+  }
+  
+  if (nrow(ev_22_xl) > 0) {
+    ev_22_xl <- table(ev_22_xl$MitoCarta3.0_SubMitoLocalization) |> as.data.frame()
+    
+    ev_22_xl <- merge(submito_no, ev_22_xl, by = "Var1", suffixes = c("", "_22xl"), all.x = TRUE) |>
+      mutate(Freq_22xl = replace_na(Freq, 0), # replacing NA with 0
+             ratio_22xl = round(Freq / Freq_all, 2),
+             ratio_22xl_mitocarta = round(Freq / Freq_mitocarta, 2)) |> # calculating ratios
+      select(Var1, ratio_22xl, ratio_22xl_mitocarta)
+  }
+  # export results
+  if (nrow(ev_22) == 0) {
+    ratios <- ev_22_xl
+    colnames(ratios) <- c("MitoCarta3.0_SubMitoLocalization", "ratio 22-xl [%]", "ratio 22-xl [%] (mitocarta)")
+  } else if (nrow(ev_22_xl) == 0) {
+    ratios <- ev_22
+    colnames(ratios) <- c("MitoCarta3.0_SubMitoLocalization", "ratio 22 [%]", "ratio 22 [%] (mitocarta)")
+  } else {
+    ratios <- merge(ev_22, ev_22_xl, by="Var1", all = TRUE)
+    colnames(ratios) <- c("MitoCarta3.0_SubMitoLocalization", "ratio 22 [%]", "ratio 22 [%] (mitocarta)", 
+                          "ratio 22-xl [%]", "ratio 22-xl [%] (mitocarta)")
+  }
+  
+  if (adj) {
+    filename <- paste0("submitolocalization_RATIOS_p_adj.csv")
+  } else {
+    filename <- "submitolocalization_RATIOS.csv"
+  }
+  
+  if (save.file) {write.csv(ratios, filename, row.names = FALSE)}
+}
+
+# Ratios for not adjusted p-values
+calculate_ratio(df_to_digg)
+
+# Ratios for adjusted p-values
+calculate_ratio(df_to_digg, TRUE)
 
 # siginificant protein after FDR correction
 tom20 <- tom20 |>
@@ -846,7 +868,7 @@ sig_tom20 <- HGNChelper::checkGeneSymbols(sig_tom20)$Suggested.Symbol
 # Prepare a Venn Diagram
 venn <- ggvenn::ggvenn(
   data = list("Borrero, Linke et al." = sig_avg_df,
-              "Özdemir et al." = sig_tom20),
+              "\u00d6zdemir et al." = sig_tom20),
   fill_color = c("orange", "grey"),
   show_percentage = FALSE,
   text_size = 8,
@@ -859,3 +881,10 @@ ggsave(plot = venn, filename = "plots/venn_diagram.pdf")
 
 intersect(sig_avg_df, sig_tom20)
 sig_avg_df[-which(sig_avg_df %in% sig_tom20)]
+
+######## Unused Code ########
+gene_names <- c(
+  "TOMM40", "TOMM70", "TOMM5", "TOMM20", "MARCHF5", "VDAC1", "VDAC2", "FKBP8", 
+  "NDKA", "NME2", "AKAP1", "MCL1", "RAB10", "KIF11", "RIF1", "BAX", "ATAD1", 
+  "DARS2", "SYNJ2BP"
+)
