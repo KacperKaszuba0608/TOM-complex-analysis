@@ -5,6 +5,8 @@ library(biomaRt) |> suppressMessages()
 library(enrichplot) |> suppressMessages()
 library(clusterProfiler) |> suppressMessages()
 
+############################### GO TERM ANALYSIS ###############################
+
 # Reading in the data
 fkbp8_kd <- vroom::vroom("./data/ProteinGroups_Mayra-sep2025-revision.txt", show_col_types = FALSE)
 
@@ -165,8 +167,8 @@ ggsave("plots_GO/heatmap_up_TOTAL.pdf", plot = p_go_heat_up_T, width = 15, heigh
 data_one_term <- fkbp8_kd |>
   select(`Protein IDs`, `Gene names`, contains("Log"), starts_with("Sig"), starts_with("q-value")) |>
   mutate(
-    sig_bool_M = `q-value M-siFKBP8 vs M-NT` < 0.05 & abs(`Log2FC M-siFKBP8 vs M-NT`) > 1,
-    sig_bool_T = `q-value T-siFKBP8 vs T-NT` < 0.05 & abs(`Log2FC T-siFKBP8 vs T-NT`) > 1,
+    sig_bool_M = `-Log10 p-value M-siFKBP8 vs M-NT` > -log10(0.05) & abs(`Log2FC M-siFKBP8 vs M-NT`) > 1,
+    sig_bool_T = `-Log10 p-value T-siFKBP8 vs T-NT` > -log10(0.05) & abs(`Log2FC T-siFKBP8 vs T-NT`) > 1,
     UNIPROT = gsub(";.*", "", `Protein IDs`),
     UNIPROT = gsub("-.", "", UNIPROT)
   )
@@ -203,12 +205,16 @@ data_to_plot <- merge(data_one_term, retrieved, by = "UNIPROT", all.x = TRUE) |>
 is.na(data_to_plot$Organelles) |> sum() == 0
 
 # MITO volcano plot
-volcano_M <- data_to_plot |>
-  ggplot() +
+volcano_M <- ggplot() +
   theme_classic() +
   geom_vline(xintercept = c(-1,1), linetype = 'dashed', color = 'grey') +
   geom_hline(yintercept = -log10(0.05), linetype = 'dashed', color = 'grey') +
-  geom_point(aes(
+  geom_point(data = subset(data_to_plot, Organelles2 == "Other"), aes(
+    x = `Log2FC M-siFKBP8 vs M-NT`,
+    y = `-Log10 p-value M-siFKBP8 vs M-NT`,
+    color = Organelles2,
+    label = `Gene names`)) +
+  geom_point(data = subset(data_to_plot, Organelles2 != "Other"), aes(
     x = `Log2FC M-siFKBP8 vs M-NT`,
     y = `-Log10 p-value M-siFKBP8 vs M-NT`,
     color = Organelles2,
@@ -234,12 +240,16 @@ volcano_M
 ggsave("plots_GO/volcano_one_term_MITO.pdf", plot = volcano_M, height = 7)
 
 # TOTAL volcano plot
-volcano_T <- data_to_plot |>
-  ggplot() +
+volcano_T <- ggplot() +
   theme_classic() +
   geom_vline(xintercept = c(-1,1), linetype = 'dashed', color = 'grey') +
   geom_hline(yintercept = -log10(0.05), linetype = 'dashed', color = 'grey') +
-  geom_point(aes(
+  geom_point(data = subset(data_to_plot, Organelles2 == "Other"), aes(
+    x = `Log2FC T-siFKBP8 vs T-NT`,
+    y = `-Log10 p-value T-siFKBP8 vs T-NT`,
+    color = Organelles2,
+    label = `Gene names`)) +
+  geom_point(data = subset(data_to_plot, Organelles2 != "Other"), aes(
     x = `Log2FC T-siFKBP8 vs T-NT`,
     y = `-Log10 p-value T-siFKBP8 vs T-NT`,
     color = Organelles2,
@@ -263,6 +273,98 @@ volcano_T <- data_to_plot |>
 volcano_T
 
 ggsave("plots_GO/volcano_one_term_TOTAL.pdf", plot = volcano_T, height = 7)
+
+# SPLIT VIOLIN PLOT
+data_to_plot_copy <- data_to_plot |>
+  mutate(color = case_when(
+    Organelles2 == 'Mitochondrium' ~ 'orange',
+    Organelles2 == 'Endoplasmatic Reticulum' ~ 'purple',
+    Organelles2 == 'Golgi aparatus' ~ 'blue',
+    Organelles2 == 'Lysosome' ~ 'magenta',
+    Organelles2 == 'Peroxisome' ~ 'darkgreen',
+    TRUE ~ 'darkgrey'
+  ))
+
+# Pivoting the df so that the Batch and LFQs are their own columns
+data_to_plot_copy <- data_to_plot_copy |> 
+  tidyr::pivot_longer(c(`Log2FC M-siFKBP8 vs M-NT`, `Log2FC T-siFKBP8 vs T-NT`), 
+                      names_to = "Batch", values_to = "LFQ") |>
+  mutate(transparency = ifelse(Batch == 'Log2FC M-siFKBP8 vs M-NT', 'MITO', 'TOTAL'))
+
+# create custom legend
+legend_grob <- grid::grobTree(
+  # Title
+  grid::textGrob("Intensity\ndistribution in", x = 0.1, y = 0.9, just = "left",
+           gp = grid::gpar(col = "black", fontsize = 9, fontface = "bold")),
+  
+  # Whole Cells color square
+  grid::rectGrob(x = 0.12, y = 0.77, width = 0.05, height = 0.1,
+           gp = grid::gpar(fill = "darkgrey", col = 'black')),
+  grid::rectGrob(x = 0.17, y = 0.77, width = 0.05, height = 0.1, 
+           gp = grid::gpar(fill = "darkgreen", col = 'black')),
+  grid::rectGrob(x = 0.22, y = 0.77, width = 0.05, height = 0.1, 
+           gp = grid::gpar(fill = "magenta", col = 'black')),
+  grid::rectGrob(x = 0.27, y = 0.77, width = 0.05, height = 0.1, 
+           gp = grid::gpar(fill = "blue", col = 'black')),
+  grid::rectGrob(x = 0.32, y = 0.77, width = 0.05, height = 0.1, 
+           gp = grid::gpar(fill = "purple", col = 'black')),
+  grid::rectGrob(x = 0.37, y = 0.77, width = 0.05, height = 0.1, 
+           gp = grid::gpar(fill = "orange", col = 'black')),
+  
+  # Whole Cells text
+  grid::textGrob("Whole Cells", x = 0.42, y = 0.77, just = "left",
+           gp = grid::gpar(col = "black", fontsize = 9)),
+  
+  # Mitochondrial Fraction color square
+  grid::rectGrob(x = 0.12, y = 0.61, width = 0.05, height = 0.1,
+           gp = grid::gpar(fill = "darkgrey", col = "darkgrey", alpha=0.5)),
+  grid::rectGrob(x = 0.17, y = 0.61, width = 0.05, height = 0.1, 
+           gp = grid::gpar(fill = "darkgreen", col = "darkgreen", alpha=0.5)),
+  grid::rectGrob(x = 0.22, y = 0.61, width = 0.05, height = 0.1, 
+           gp = grid::gpar(fill = "magenta", col = "magenta", alpha=0.5)),
+  grid::rectGrob(x = 0.27, y = 0.61, width = 0.05, height = 0.1, 
+           gp = grid::gpar(fill = "blue", col = "blue", alpha=0.5)),
+  grid::rectGrob(x = 0.32, y = 0.61, width = 0.05, height = 0.1, 
+           gp = grid::gpar(fill = "purple", col = "purple", alpha=0.5)),
+  grid::rectGrob(x = 0.37, y = 0.61, width = 0.05, height = 0.1, 
+           gp = grid::gpar(fill = "orange", col = "orange", alpha=0.5)),
+  grid::textGrob("Mitochondrial\nFraction", x = 0.42, y = 0.61, just = "left",
+           gp = grid::gpar(col = "black", fontsize = 9))
+)
+
+# half violin plot
+organelle_violin_split <- ggplot(data_to_plot_copy, 
+       aes(x = reorder(`Organelles2`, LFQ, FUN = function(x) -median(x)), 
+           y = LFQ, 
+           fill = Organelles2)) +
+  gghalves::geom_half_violin(
+    aes(alpha = transparency, #split = Batch, 
+        color = ifelse(Batch == 'Log2FC M-siFKBP8 vs M-NT', color, 'black')),
+    draw_quantiles = c(0.5),
+    side = c(rep('l', 6), rep('r', 6)),
+    position = 'identity') + # stacking the plots into one
+  ylab('Log2 Mean LFQ Intensity') +
+  scale_color_identity() +
+  scale_fill_manual(values = c(
+    'Mitochondrium' = 'orange',
+    'Endoplasmatic Reticulum' = 'purple',
+    'Golgi aparatus' = 'blue',
+    'Lysosome' = 'magenta',
+    'Peroxisome' = 'darkgreen',
+    'Other' = 'grey'
+  )) +
+  scale_alpha_manual(values = c("MITO"=0.5, "TOTAL"=1)) +
+  coord_flip() +
+  annotation_custom(legend_grob, xmin = 2, xmax = 6, ymin = -5, ymax = -3) +
+  guides(fill = "none", alpha = 'none') +
+  theme_classic() +
+  theme(axis.title.y = element_blank(), axis.text = element_text(size = 10)) +
+  scale_x_discrete(limits = c(organelles |> unname(), "Other"), 
+                   labels = gsub(" ", "\n", c(organelles |> unname(), "Other")))
+
+organelle_violin_split
+
+ggsave("plots_GO/half_violin_organelles.pdf")
 
 ############################ Mitophagy / Apoptosis #############################
 
@@ -299,7 +401,12 @@ volcano_M2 <- data_to_plot2 |>
   theme_classic() +
   geom_vline(xintercept = c(-1,1), linetype = 'dashed', color = 'grey') +
   geom_hline(yintercept = -log10(0.05), linetype = 'dashed', color = 'grey') +
-  geom_point(aes(
+  geom_point(data = subset(data_to_plot2, bio_processes == "Other"), aes(
+    x = `Log2FC M-siFKBP8 vs M-NT`,
+    y = `-Log10 p-value M-siFKBP8 vs M-NT`,
+    color = bio_processes,
+    label = `Gene names`)) +
+  geom_point(data = subset(data_to_plot2, bio_processes != "Other"), aes(
     x = `Log2FC M-siFKBP8 vs M-NT`,
     y = `-Log10 p-value M-siFKBP8 vs M-NT`,
     color = bio_processes,
@@ -327,7 +434,12 @@ volcano_T2 <- data_to_plot2 |>
   theme_classic() +
   geom_vline(xintercept = c(-1,1), linetype = 'dashed', color = 'grey') +
   geom_hline(yintercept = -log10(0.05), linetype = 'dashed', color = 'grey') +
-  geom_point(aes(
+  geom_point(data = subset(data_to_plot2, bio_processes == "Other"), aes(
+    x = `Log2FC T-siFKBP8 vs T-NT`,
+    y = `-Log10 p-value T-siFKBP8 vs T-NT`,
+    color = bio_processes,
+    label = `Gene names`)) +
+  geom_point(data = subset(data_to_plot2, bio_processes != "Other"), aes(
     x = `Log2FC T-siFKBP8 vs T-NT`,
     y = `-Log10 p-value T-siFKBP8 vs T-NT`,
     color = bio_processes,
