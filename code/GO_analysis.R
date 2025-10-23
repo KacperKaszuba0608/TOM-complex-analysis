@@ -12,11 +12,11 @@ fkbp8_kd <- vroom::vroom("./data/ProteinGroups_Mayra-sep2025-revision.txt", show
 
 data_mito <- fkbp8_kd |>
   dplyr::select(`Gene names`, `Protein IDs`, contains("M-"), -starts_with("LFQ"), -starts_with("Razor")) |>
-  mutate(sig_bool = ifelse(is.na(`Significant M-siFKBP8 vs M-NT`), FALSE, TRUE))
+  mutate(sig_bool = `-Log10 p-value M-siFKBP8 vs M-NT` > -log10(0.05))
 
 data_total <- fkbp8_kd |>
   dplyr::select(`Gene names`, `Protein IDs`, contains("T-"), -starts_with("LFQ"), -starts_with("Razor")) |>
-  mutate(sig_bool = ifelse(is.na(`Significant T-siFKBP8 vs T-NT`), FALSE, TRUE))
+  mutate(sig_bool = `-Log10 p-value T-siFKBP8 vs T-NT` > -log10(0.05))
 
 # downloading all annotation
 mart <- useMart("ENSEMBL_MART_ENSEMBL", dataset = "hsapiens_gene_ensembl", version = "Ensembl Genes 115")
@@ -50,8 +50,8 @@ this.group.up <- data_mito |>
 this.ont = "ALL"
 
 go_enrich.up <- enrichGO(gene = this.group.up, OrgDb="org.Hs.eg.db", 
-                         pvalueCutoff = 0.05, pAdjustMethod="fdr",
-                         ont=this.ont)
+                         pvalueCutoff = 0.05, pAdjustMethod="none", 
+                         ont=this.ont, universe = data_mito$ENTREZID)
 go_enrichx.up <- setReadable(go_enrich.up, 'org.Hs.eg.db', 'ENTREZID')
 go_enrichx2.up_M <- pairwise_termsim(go_enrichx.up)
 
@@ -63,15 +63,14 @@ this.group.down <- data_mito |>
 this.ont = "ALL"
 
 go_enrich.down <- enrichGO(gene = this.group.down, OrgDb="org.Hs.eg.db", 
-                           pvalueCutoff = 0.05, pAdjustMethod="fdr",
-                           ont=this.ont)
+                           pvalueCutoff = 0.05, pAdjustMethod="none", 
+                           ont=this.ont, universe = data_mito$ENTREZID)
 go_enrichx.down <- setReadable(go_enrich.down, 'org.Hs.eg.db', 'ENTREZID')
-# Don't have enriched terms
-# go_enrichx2.down_M <- pairwise_termsim(go_enrichx.down)
+go_enrichx2.down_M <- pairwise_termsim(go_enrichx.down)
 
 # DATA TO EXPORT
 df_go_mitos_up <- go_enrichx2.up_M@result
-# df_go_mitos_down <- go_enrichx2.down_M@result
+df_go_mitos_down <- go_enrichx2.down_M@result
 
 ################################### GO TOTAL ###################################
 # GO enrichment up
@@ -82,8 +81,8 @@ this.group.up <- data_total |>
 this.ont = "ALL"
 
 go_enrich.up <- enrichGO(gene = this.group.up, OrgDb="org.Hs.eg.db", 
-                         pvalueCutoff = 0.05, pAdjustMethod="fdr",
-                         ont=this.ont)
+                         pvalueCutoff = 0.05, pAdjustMethod="none",
+                         ont=this.ont, universe = data_total$ENTREZID)
 go_enrichx.up <- setReadable(go_enrich.up, 'org.Hs.eg.db', 'ENTREZID')
 go_enrichx2.up_T <- pairwise_termsim(go_enrichx.up)
 
@@ -95,10 +94,9 @@ this.group.down <- data_total |>
 this.ont = "ALL"
 
 go_enrich.down <- enrichGO(gene = this.group.down, OrgDb="org.Hs.eg.db", 
-                           pvalueCutoff = 0.05, pAdjustMethod="fdr",
-                           ont=this.ont)
+                           pvalueCutoff = 0.05, pAdjustMethod="none", 
+                           ont=this.ont, universe = data_total$ENTREZID)
 go_enrichx.down <- setReadable(go_enrich.down, 'org.Hs.eg.db', 'ENTREZID')
-# Don't have enriched terms
 # go_enrichx2.down_T <- pairwise_termsim(go_enrichx.down)
 
 # DATA TO EXPORT
@@ -112,6 +110,7 @@ geneList <- setNames(data_mito$`Log2FC M-siFKBP8 vs M-NT`, data_mito$`Gene names
 color_scale <- scale_fill_gradient2(low = "red", mid = "grey", high = "green", 
                                     midpoint = 0, limits = c(-5, 5))
 
+# Enriched Up
 p_go_heat_up_M <- heatplot(go_enrichx2.up_M, foldChange = geneList) +
   theme_bw() +
   theme(axis.text.y = element_text(size = 10), 
@@ -119,29 +118,46 @@ p_go_heat_up_M <- heatplot(go_enrichx2.up_M, foldChange = geneList) +
         panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
   scale_fill_gradient(low="grey",high="green") +
   scale_y_discrete(position = 'right', labels = function(x) str_wrap(x, width = 25)) +
-  coord_flip()
+  coord_flip() +
+  labs(title = "p-value cutoff 0.05 & none adjustment method")
 
 p_go_heat_up_M
 
 ggsave("plots_GO/heatmap_up_MITO.pdf", plot = p_go_heat_up_M, width = 20, height = 7)
 
+# Enriched Down
+p_go_heat_down_M <- heatplot(go_enrichx2.down_M, foldChange = geneList) +
+  theme_bw() +
+  theme(axis.text.y = element_text(size = 10), 
+        axis.text.x = element_text(size = 8, angle = 90, hjust = 0, vjust = 0), 
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
+  scale_fill_gradient(low="red",high="grey") +
+  scale_y_discrete(position = 'right', labels = function(x) str_wrap(x, width = 25)) +
+  coord_flip() +
+  labs(title = "p-value cutoff 0.05 & none adjustment method")
+
+p_go_heat_down_M
+
+ggsave("plots_GO/heatmap_down_MITO.pdf", plot = p_go_heat_down_M, width = 20, height = 7)
+
 # TOTAL
 geneList <- setNames(data_total$`Log2FC T-siFKBP8 vs T-NT`, data_total$`Gene names`)
 color_scale <- scale_fill_gradient2(low = "red", mid = "grey", high = "green", 
                                     midpoint = 0, limits = c(-5, 5))
-
+# Enriched Up
 p_go_heat_up_T <- heatplot(go_enrichx2.up_T, foldChange = geneList) +
   theme_bw() +
   theme(axis.text.y = element_text(size = 8), 
-        axis.text.x = element_text(size = 8, angle = 45, hjust = 0, vjust = 0), 
+        axis.text.x = element_text(size = 8, angle = 90, hjust = 0, vjust = 0), 
         panel.grid.major = element_blank(), panel.grid.minor = element_blank()) +
   scale_fill_gradient(low="grey",high="green") +
   scale_y_discrete(position = 'right', labels = function(x) str_wrap(x, width = 25)) +
-  coord_flip()
+  coord_flip() +
+  labs(title = "p-value cutoff 0.05 & none adjustment method")
 
 p_go_heat_up_T
 
-ggsave("plots_GO/heatmap_up_TOTAL.pdf", plot = p_go_heat_up_T, width = 10, height = 5)
+ggsave("plots_GO/heatmap_up_TOTAL.pdf", plot = p_go_heat_up_T, width = 15, height = 7)
 
 ############################ ONE GO TERM ENRICHMENT ############################
 
@@ -149,7 +165,7 @@ ggsave("plots_GO/heatmap_up_TOTAL.pdf", plot = p_go_heat_up_T, width = 10, heigh
 data_one_term <- fkbp8_kd |>
   select(`Protein IDs`, `Gene names`, contains("Log"), starts_with("Sig"), starts_with("q-value")) |>
   mutate(
-    sig_bool_M = ifelse(is.na(`Significant M-siFKBP8 vs M-NT`), FALSE, TRUE),
+    sig_bool_M = `q-value M-siFKBP8 vs M-NT` < 0.05 & abs(`Log2FC M-siFKBP8 vs M-NT`) > 1,
     sig_bool_T = `q-value T-siFKBP8 vs T-NT` < 0.05 & abs(`Log2FC T-siFKBP8 vs T-NT`) > 1,
     UNIPROT = gsub(";.*", "", `Protein IDs`),
     UNIPROT = gsub("-.", "", UNIPROT)
