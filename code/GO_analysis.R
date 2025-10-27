@@ -343,7 +343,7 @@ organelle_violin_split <- ggplot(data_to_plot_copy,
     draw_quantiles = c(0.5),
     side = c(rep('l', 6), rep('r', 6)),
     position = 'identity') + # stacking the plots into one
-  ylab('Log2 Mean LFQ Intensity') +
+  ylab('Log2 FC siFKBP8 vs NT') +
   scale_color_identity() +
   scale_fill_manual(values = c(
     'Mitochondrium' = 'orange',
@@ -364,7 +364,7 @@ organelle_violin_split <- ggplot(data_to_plot_copy,
 
 organelle_violin_split
 
-ggsave("plots_GO/half_violin_organelles.pdf")
+ggsave("plots_GO/half_violin_organelles_v2.pdf")
 
 ############################ Mitophagy / Apoptosis #############################
 
@@ -389,11 +389,21 @@ retrieved <- AnnotationDbi::select(org.Hs.eg.db, keytype = "GOALL",
 
 # Merging with our original dataset
 data_to_plot2 <- merge(data_one_term, retrieved, by = "UNIPROT", all.x = TRUE) |>
-  mutate(bio_processes = replace_na(bio_processes, "Other")) |>
+  mutate(bio_processes = replace_na(bio_processes, "Other"),
+         annotate = ifelse(`Gene names` == 'FKBP8' | grepl('TOMM', `Gene names`), TRUE, FALSE)) |>
   distinct()
 
 # Check if NA still exist
 is.na(data_to_plot2$bio_processes) |> sum() == 0
+
+# Density
+data_to_plot2 |>
+  pivot_longer(c(`Log2FC M-siFKBP8 vs M-NT`, `Log2FC T-siFKBP8 vs T-NT`), 
+               names_to = "Batch", values_to = "LFQ") |>
+  ggplot(aes(x = LFQ, color = Batch)) +
+  geom_density()
+
+ggsave("plots_GO/fc_density_plot.pdf")
 
 # MITO volcano plot
 volcano_M2 <- data_to_plot2 |>
@@ -411,22 +421,23 @@ volcano_M2 <- data_to_plot2 |>
     y = `-Log10 p-value M-siFKBP8 vs M-NT`,
     color = bio_processes,
     label = `Gene names`)) +
-  ggrepel::geom_text_repel(data = subset(data_to_plot2, sig_bool_M), aes(
+  ggrepel::geom_text_repel(data = subset(data_to_plot2, annotate), aes(
     x = `Log2FC M-siFKBP8 vs M-NT`,
     y = `-Log10 p-value M-siFKBP8 vs M-NT`,
-    color = bio_processes,
+    color = ifelse(bio_processes == "Other", 'black', bio_processes),
     label = `Gene names`
   ), show.legend = F, max.overlaps = Inf, verbose = TRUE, min.segment.length = 0) +
   scale_color_manual("Organelles", values = c(
     'Apoptosis' = 'orange',
     'Mitophagy' = 'purple',
     'Mitophagy | Apoptosis' = 'darkgreen',
-    'Other' = 'grey'
-  ))
+    'Other' = 'grey',
+    'black' = 'black'
+  ), breaks = c("Apoptosis", "Mitophagy", "Mitophagy | Apoptosis", "Other"))
 
 volcano_M2
 
-ggsave("plots_GO/volcano_bio_processes_MITO.pdf", plot = volcano_M2, height = 7)
+ggsave("plots_GO/volcano_bio_processes_MITO_v2.pdf", plot = volcano_M2, height = 7)
 
 # TOTAL volcano plot
 volcano_T2 <- data_to_plot2 |>
