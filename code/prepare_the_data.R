@@ -1,11 +1,11 @@
-rlang::inform("Loading Libraries...")
+message("Loading Libraries...")
 library(org.Hs.eg.db) |> suppressMessages()
 library(tidyverse) |> suppressMessages()
 library(ggrepel) |> suppressMessages()
 
 ################################# LOAD DATA ####################################
 rlang::inform(strrep("#", 30))
-rlang::inform("Data Loading...")
+message("Data Loading...")
 
 data_to_plot <- read_csv('./data/data_to_plot.csv', show_col_types = FALSE) |> # data to plotting
   mutate(protein_names = sapply(Protein.IDs, function(ID) {
@@ -36,7 +36,10 @@ dataset2 <- merge(dataset2, dataset2_supp, by.x = "Protein IDs", by.y = "Protein
   dplyr::select(-Fasta.headers)
 
 tom20 <- readxl::read_xlsx("./data/Auswertung PR80 proteingroups.xlsx", sheet = "proteinGroups") |> 
-  dplyr::select(`Gene names`, `T-test Difference`, `"-Log T-test p-value"`)
+  dplyr::select(`Gene names`, `T-test Difference`, `"-Log T-test p-value"`) |>
+  dplyr::mutate(`Gene names` = gsub(";.*", "", `Gene names`),
+    Gene_corrected = HGNChelper::checkGeneSymbols(`Gene names`)$Suggested.Symbol |> suppressMessages(),
+    Gene_corrected = gsub(" .*", "", Gene_corrected))
 
 ############################### MITOCOP DATASET ################################
 
@@ -74,7 +77,7 @@ functional_df <- functional_df |>
 
 ################################ DATA CLEANING #################################
 rlang::inform(strrep("#", 30))
-rlang::inform("Data Cleaning...")
+message("Data Cleaning...")
 
 cleaned_data <- data_to_plot |>
   filter(!is.na(Protein.IDs)) |>
@@ -118,7 +121,7 @@ cleaned_data <- cleaned_data[-which(duplicated(cleaned_data$protein_names)),]
 
 ############################### DATA ANNOTATING ################################
 rlang::inform(strrep("#", 30))
-rlang::inform("Annotating the Data...")
+message("Annotating the Data...")
 
 # Annotating dataset 1
 UniProt <- AnnotationDbi::select(org.Hs.eg.db,
@@ -146,14 +149,15 @@ dataset2 <- merge(dataset2, UniProt, by.x = "Gene_names", by.y = "SYMBOL", all.x
 
 # Annotating tom20 dataset
 UniProt <- AnnotationDbi::select(org.Hs.eg.db,
-                                 keys = tom20$`Gene names`,
+                                 keys = tom20$Gene_corrected,
                                  keytype = "SYMBOL",
                                  columns = "UNIPROT", fuzzy = FALSE) |>
   group_by(SYMBOL) |>
   summarise(UNIPROT = paste(UNIPROT, collapse = ";")) |>
   ungroup() |> suppressMessages()
 
-tom20 <- merge(tom20, UniProt, by.x = "Gene names", by.y = "SYMBOL", all.x = TRUE)
+tom20 <- merge(tom20, UniProt, by.x = "Gene_corrected", by.y = "SYMBOL", all.x = TRUE)
+tom20 <- tom20[-which(is.na(tom20$Gene_corrected)),]
 
 # Annotating mitocopies dataset
 UniProt <- AnnotationDbi::select(org.Hs.eg.db,
@@ -187,5 +191,5 @@ functional_df <- merge(functional_df, UniProt, by.x = "Gene name", by.y = "SYMBO
 rm(UniProt)
 
 rlang::inform(strrep("#", 30))
-rlang::inform("Data is Ready to plotting!")
+message("The data is ready for plotting!")
 gc()
