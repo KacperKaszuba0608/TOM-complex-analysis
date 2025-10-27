@@ -298,33 +298,34 @@ average_plot_v3 <- ggplot() +
                 "Regulation & signaling", "Other", "Unknown")) +
   theme_classic() +
   geom_text_repel(data = subset(average_func_df, annotate), mapping = aes(
-    x = avg_fc, y = -log10(p_allmv.adj), color = functional_class, label = protein_names,
-    alpha = transparency),
+    x = avg_fc, y = -log10(p_allmv.adj), color = functional_class, label = protein_names, 
+    alpha = "no_transparent"),
     verbose = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE, 
     point.size = 0.2
   ) + 
   labs(x = "Log2 FC TOMM22-FLAG vs EV (n=6)",
        y = "-log10 adj. p-value") +
   theme(
-    legend.position = c(.3,0.98),
+    legend.position = c(.4,0.98),
     legend.justification = c("right", "top"),
     legend.box.just = "left",
     legend.background = element_blank(),
-    legend.margin = margin(b=0)
+    legend.margin = margin(b=0),
+    legend.text = element_text(size = 6),
+    legend.title = element_text(size = 8),
+    legend.key.size = unit(0.3, "cm")
   ) +
   scale_x_continuous(limits = c(-4,10), breaks = c(seq(-2,10,2),FC.cutoff), 
                      labels = c(seq(-2,10,2),FC.cutoff) |> as.character(), expand = c(0,0)) +
   scale_y_continuous(limits = c(0, 4.1), breaks = c(seq(0, 4, 1), round(-log10(0.05), 2)), 
                      labels = c(seq(0, 4, 1), round(-log10(0.05), 2)) |> as.character(), 
                      expand = c(0,0)) + 
-  guides(alpha = "none", color = guide_legend(override.aes = list(size = 4)))
+  guides(alpha = "none")
 
-# average_plot_v3
+average_plot_v3
 
-ggsave(plot = average_plot_v3, filename = "plots/figure_4B_v2.png", 
-       width = 4*800, height = 4*467, units = "px")
 ggsave(plot = average_plot_v3, filename = "plots/figure_4B_v2.pdf", 
-       width = 4*800, height = 4*467, units = "px")
+       width = 5, height = 4)
 
 ##################### FIGURE 5 A v2 ######################
 xlvsnxl_DF <- merge(cleaned_data, tom20, by = "UNIPROT", all.x = TRUE)
@@ -388,7 +389,7 @@ small_tims <- c("TIM8B", "TIM13", "T10B", "TIM8A")
 
 only_FC <- only_FC |>
   mutate(FC_boost = FC_22_ev_XL - FC_22_ev,
-         FC_boost_percent = round((FC_boost / FC_22_ev) * 100, 2),
+         FC_boost_percent = round((FC_boost / FC_22_ev) * 100, 0),
          annotate = ifelse(FC_boost > 2, TRUE, FALSE)) |>
   separate(Protein.IDs, c("ID1", "Simple_ID", "Gene_name"), sep="\\|") |>
   mutate(Simple_ID = gsub("-\\d+", "", Simple_ID, perl = TRUE),
@@ -435,10 +436,11 @@ boosted_bar_plot <- only_FC_with_mito |>
     x = FC_22_ev_XL,
     y = Gene_name,
     label = paste0(Gene_name, ": ", FC_boost_percent, "% boosted")
-  ), hjust = -0.2) +
+  ), hjust = -0.05) +
   scale_x_continuous(limits = c(0,8), expand = c(0,0)) +
   labs(
-    title = paste0("BAR PLOT OF THE LOG2 FOLD CHANGE BOOST (FC-XL - FC) > ",boost.cutoff," and FC-XL > ", FC_XL.cutoff),
+    # title = paste0("BAR PLOT OF THE LOG2 FOLD CHANGE BOOST (FC-XL - FC) > ",
+    #                boost.cutoff," and FC-XL > ", FC_XL.cutoff),
     x = "Log2 FC XL-TOMM22-FLAG / XL-EV",
     y = "Proteins boosted by cross-linking"
   ) +
@@ -449,8 +451,7 @@ boosted_bar_plot <- only_FC_with_mito |>
 # boosted_bar_plot
 # ggplotly(boosted_bar_plot, tooltip = c("y", "label"))
 
-ggsave(plot = boosted_bar_plot, filename = "plots/figure_5B.png", width = 10, height = 15)
-ggsave(plot = boosted_bar_plot, filename = "plots/figure_5B.pdf", width = 10, height = 15)
+ggsave(plot = boosted_bar_plot, filename = "plots/figure_5B_v2.pdf", width = 10, height = 15)
 
 ############################## FIGURE S5 B #############################
 
@@ -467,8 +468,7 @@ stochiometric_df <- merge(cleaned_data, mitocopies_df, by = "UNIPROT", all.x = T
            `Log10 mean mito-copies per cell (≥2/3 Reps)` < 4 & `Mitochondrial based on all evidence sources` == "other" ~ "Low abundant",
            TRUE ~ "Null value"
          ),
-         is_significant = ifelse(FC_22_ev_XL > 1 & p_22_XL.adj < 0.05,
-                                 TRUE, FALSE),
+         is_significant = ifelse(p_22_XL.adj < 0.05, TRUE, FALSE),
          annotate = ifelse(FC_22_ev_XL >= 2.4 & is_significant & mito_copies_class != "Null value" 
                            | Gene %in% c("TOMM40L")
                            , TRUE, FALSE))
@@ -516,7 +516,7 @@ stochiometric_plot <- ggplot() +
     x = FC_22_ev_XL, y = FC_22_ev, color = MitoCarta3.0_SubMitoLocalization, label = protein_names),
     verbose = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE
   ) + 
-  scale_shape_manual("adj. p-value (XL) < 0.05 \n& FC (XL) > 1", 
+  scale_shape_manual("adj. p-value (XL) < 0.05", 
                      values = c("TRUE" = 16, "FALSE" = 1), 
                      breaks = c("TRUE", "FALSE")) +
   scale_color_manual(
@@ -540,11 +540,12 @@ stochiometric_plot <- ggplot() +
   labs(y = "Log2 FC TOMM22-FLAG / EV (n=3)",
        x = "Log2 FC XL-TOMM22-FLAG / XL-EV (n=3)") +
   theme(
-    legend.position = c(.3, .97),
+    legend.position = c(.4, .97),
     legend.justification = c("right", "top"),
     legend.box.just = "left",
     legend.spacing.y = unit(0, "cm"),
-    legend.background = element_blank()
+    legend.background = element_blank(),
+    legend.key.size = unit(0.3, "cm")
   ) +
   scale_x_continuous(limits = c(-6, 8), breaks = seq(-6,8,2)) +
   scale_y_continuous(limits = c(-3, 8), breaks = seq(-2,8,2))
@@ -552,8 +553,7 @@ stochiometric_plot <- ggplot() +
 # stochiometric_plot
 # ggplotly(stochiometric_plot)
 
-ggsave(plot = stochiometric_plot, filename = "plots/figure_S5B_v2.png", width = 10, height = 10)
-ggsave(plot = stochiometric_plot, filename = "plots/figure_S5B_v2.pdf", width = 10, height = 10)
+ggsave(plot = stochiometric_plot, filename = "plots/figure_S5B_v3.pdf", width = 5, height = 5)
 
 ############################## FIGURE S5 C #############################
 
@@ -584,9 +584,8 @@ crosslinked_df <- cleaned_data |>
                       , TRUE, FALSE),
     annotate = ifelse(Gene == "HM13", FALSE, annotate),
     transparency = case_when(
-      p_22_XL.adj < 0.05 & FC_22_ev_XL > 2 ~ "no_transparent",
-      p_22_XL < 0.05 & FC_22_ev_XL > 2 ~ "less_transparent",
-      TRUE ~ "high_transparent"
+      FC_22_ev_XL > 2 ~ "no_transparent",
+      TRUE ~ "less_transparent"
     ))
 
 crosslinked_volcano <- ggplot() +
@@ -605,8 +604,7 @@ crosslinked_volcano <- ggplot() +
     "other" = "darkgrey"), 
     breaks = c("TOM subunits", "has yeast homolog", "other")) +
   scale_alpha_manual("", values = c("no_transparent" = 1, 
-                                    "less_transparent" = 0.6,
-                                    "high_transparent" = 0.1)) +
+                                    "less_transparent" = 0.3)) +
   geom_text_repel(data = subset(crosslinked_df, annotate), 
                   aes(x = FC_22_ev_XL, y = -log10(p_22_XL.adj), color = colors_class, 
                       label = protein_names, alpha = transparency),
@@ -615,7 +613,7 @@ crosslinked_volcano <- ggplot() +
        x = "Log2 FC XL-TOMM22-FLAG / XL-EV (n=3)") +
   guides(alpha="none") +
   theme(
-    legend.position = c(.3, .97),
+    legend.position = c(.35, .99),
     legend.justification = c("right", "top"),
     legend.box.just = "left",
     legend.spacing.y = unit(0, "cm"),
@@ -625,11 +623,10 @@ crosslinked_volcano <- ggplot() +
   scale_y_continuous(limits = c(0, 2), breaks = c(1, 2, round(-log10(0.05),2)),
                      labels = c(1, 2, round(-log10(0.05),2)) |> as.character(), expand = c(0,0))
 
-# crosslinked_volcano
+crosslinked_volcano
 # ggplotly(crosslinked_volcano)
 
-ggsave(plot = crosslinked_volcano, filename = "plots/figure_S5C.png", width = 7, height = 5)
-ggsave(plot = crosslinked_volcano, filename = "plots/figure_S5C.pdf", width = 7, height = 5)
+ggsave(plot = crosslinked_volcano, filename = "plots/figure_S5C_v2.pdf", width = 5, height = 4)
 
 ############ NEW PLOT Dataset1 VS Dataset 2 colored by Özdemir ################
 
@@ -705,16 +702,22 @@ ggsave(plot = major_4_plot, filename = "plots/figure_for_point_major_4.pdf", wid
 df_to_plot1 <- cleaned_data |>
   dplyr::select(protein_names, Gene, FC_22_ev, p_22, p_22.adj, UNIPROT)
 
-df_to_plot1 <- merge(df_to_plot1, tom20, by = "UNIPROT")
+df_to_plot1 <- merge(df_to_plot1, tom20, by = "UNIPROT") |>
+  mutate(group = ifelse(grepl("TOMM", Gene) & Gene != "TOMM34", 'purple', "black"),
+         transparency = ifelse(FC_22_ev < 0 & `T-test Difference` < 0, 0.2, 1))
 
 test1 <- cor.test(~ FC_22_ev + `T-test Difference`, data = df_to_plot1)
 cor1 <- round(test1$estimate, 2)
 
 pear_plot1 <- df_to_plot1 |>
-  ggplot() +
+  ggplot(aes(y = FC_22_ev, x = `T-test Difference`, color = group, alpha = transparency)) +
   geom_abline(slope = 1, intercept = 0, color = "blue", linewidth = 1) +
   theme_classic() +
-  geom_point(aes(y = FC_22_ev, x = `T-test Difference`)) +
+  geom_point() +
+  geom_text_repel(aes(label = ifelse(grepl("TOMM", Gene) & Gene != "TOMM34", protein_names, "")),
+                  verbose = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE) +
+  scale_color_identity() +
+  scale_alpha_identity() +
   labs(subtitle = paste0("Pearson corr coef: ", cor1),
        y = "Dataset1 log2 FC TOM22 / EV (n=3)",
        x = "T-test Difference \u00d6zdemir et al.") +
@@ -727,16 +730,24 @@ pear_plot1 <- df_to_plot1 |>
 df_to_plot2 <- dataset2 |>
   select(protein_name, Gene_names, Log2_enrichment_FLAG_EV, Log10_pvalue_FLAG_EV, UNIPROT)
 
-df_to_plot2 <- merge(df_to_plot2, tom20, by = "UNIPROT")
+df_to_plot2 <- merge(df_to_plot2, tom20, by = "UNIPROT") |>
+  mutate(group = ifelse(grepl("TOMM", Gene_names) & Gene_names != "TOMM34", 'purple', "black"),
+         transparency = ifelse(Log2_enrichment_FLAG_EV < 0 & `T-test Difference` < 0, 0.2, 1))
 
 test2 <- cor.test(~ Log2_enrichment_FLAG_EV + `T-test Difference`, data = df_to_plot2)
 cor2 <- round(test2$estimate, 2)
 
 pear_plot2 <- df_to_plot2 |>
-  ggplot() +
+  ggplot(aes(y = Log2_enrichment_FLAG_EV, x = `T-test Difference`, 
+             color = group, alpha = transparency)) +
   geom_abline(slope = 1, intercept = 0, color = "blue", linewidth = 1) +
   theme_classic() +
-  geom_point(aes(y = Log2_enrichment_FLAG_EV, x = `T-test Difference`)) +
+  geom_point() +
+  geom_text_repel(aes(label = ifelse(grepl("TOMM", Gene_names) & 
+                                       Gene_names != "TOMM34", protein_name, "")),
+                  verbose = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE) +
+  scale_color_identity() +
+  scale_alpha_identity() +
   labs(subtitle = paste0("Pearson corr coef: ", cor2),
        y = "Dataset2 log2 FC TOM22 / EV (n=3)",
        x = "T-test Difference \u00d6zdemir et al.") +
@@ -747,16 +758,22 @@ pear_plot2 <- df_to_plot2 |>
 
 # Plot 3
 df_to_plot3 <- combined_df |>
-  filter(FC_22_ev != -5 & Log2_enrichment_FLAG_EV != -5)
+  filter(FC_22_ev != -5 & Log2_enrichment_FLAG_EV != -5) |>
+  mutate(group = ifelse(grepl("TOMM", Gene) & Gene != "TOMM34", 'purple', "black"),
+         transparency = ifelse(FC_22_ev < 0 & Log2_enrichment_FLAG_EV < 0, 0.2, 1))
 
 test3 <- cor.test(~ FC_22_ev + Log2_enrichment_FLAG_EV, df_to_plot3)
 cor3 <- round(test3$estimate, 2)
 
 pear_plot3 <- df_to_plot3 |>
-  ggplot() +
+  ggplot(aes(x = Log2_enrichment_FLAG_EV, y = FC_22_ev, color = group, alpha = transparency)) +
   geom_abline(slope = 1, intercept = 0, color = "blue", linewidth = 1) +
   theme_classic() +
-  geom_point(aes(x = Log2_enrichment_FLAG_EV, y = FC_22_ev)) +
+  geom_point() +
+  geom_text_repel(aes(label = ifelse(grepl("TOMM", Gene) & Gene != "TOMM34", protein_names, "")),
+                  verbose = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE) +
+  scale_color_identity() +
+  scale_alpha_identity() +
   labs(subtitle = paste0("Pearson corr coef: ", cor3),
        y = "Dataset1 log2 FC TOM22 / EV (n=3)",
        x = "Dataset2 log2 FC TOM22 / EV (n=3)") +
@@ -766,10 +783,9 @@ pear_plot3 <- df_to_plot3 |>
 # pear_plot3
 
 pear_plots <- ggpubr::ggarrange(pear_plot1, pear_plot2, pear_plot3, ncol = 3, nrow = 1)
-# pear_plots
+pear_plots
 
-ggsave("plots/pearson_plots.png", pear_plots, width = 10, height = 5)
-ggsave("plots/pearson_plots.pdf", pear_plots, width = 10, height = 5)
+ggsave("plots/pearson_plots_v2.pdf", pear_plots, width = 10, height = 5)
 
 ######################## DIGGING #########################
 small_tims <- c("TIM8B", "TIM13", "T10B", "TIM8A")
@@ -856,31 +872,93 @@ calculate_ratio(df_to_digg)
 # Ratios for adjusted p-values
 calculate_ratio(df_to_digg, TRUE)
 
-# siginificant protein after FDR correction
+# significant protein after FDR correction
 tom20 <- tom20 |>
   mutate(p.value = 10^-(`"-Log T-test p-value"`))
 
-sig_avg_df <- average_df[(which(average_df$p_allmv.adj < 0.05)), "Gene"]
-sig_tom20 <- tom20[(which(tom20$p.value < 0.05)), "Gene names"] |> unlist() |> unname()
-sig_tom20 <- sapply(sig_tom20, function(gene) str_split(gene, ";")) |> unlist()
-sig_tom20 <- HGNChelper::checkGeneSymbols(sig_tom20)$Suggested.Symbol
+FC.cutoff_avg <- average_df[average_df$Gene == "TOMM70", "avg_fc"] |> na.omit()
+FC.cutoff_tom20 <- tom20[tom20$Gene_corrected == "TOMM70", "T-test Difference"] |> na.omit()
+FC.cutoff_XL <- cleaned_data[cleaned_data$Gene == "TOMM70", "FC_22_ev_XL"] |> na.omit()
+
+insig_avg_df <- average_df |>
+  filter(
+    # p_allmv.adj > 0.05 &
+      avg_fc < FC.cutoff_avg) |>
+  select(Gene) |> separate_rows(Gene, sep = ";") |> pull()
+
+sig_avg_df <- average_df |>
+  filter(
+    # p_allmv.adj < 0.05 &
+      avg_fc > FC.cutoff_avg) |>
+  select(Gene) |> separate_rows(Gene, sep = ";") |> pull()
+
+insig_xl_df <- cleaned_data |>
+  filter(
+    FC_22_ev_XL < FC.cutoff_avg
+  ) |>
+  select(Gene) |> separate_rows(Gene, sep = ";") |> pull()
+
+sig_xl_df <- cleaned_data |>
+  filter(
+    FC_22_ev_XL > FC.cutoff_avg
+  ) |>
+  select(Gene) |> separate_rows(Gene, sep = ";") |> pull()
+
+sig_tom20 <- tom20 |> 
+  filter(
+    # p.value < 0.05 &
+      `T-test Difference` > FC.cutoff_tom20) |>
+  select(Gene_corrected) |> separate_rows(Gene_corrected, sep = ";") |> pull()
+
+insig_tom20 <- tom20 |> 
+  filter(
+    # p.value > 0.05 &
+      `T-test Difference` < FC.cutoff_tom20) |>
+  select(Gene_corrected) |> separate_rows(Gene_corrected, sep = ";") |> pull()
 
 # Prepare a Venn Diagram
+title = paste0("Borrero, Linke et al.: FC cutoff = ", FC.cutoff_avg |> round(2),
+               "\n\u00d6zdemir et al.: FC cutoff = ", FC.cutoff_tom20 |> round(2))
+
+protein_list <- list(
+  "Insignificant Proteins XL\nBorrero, Linke et al." = insig_xl_df, #insig_xl_df, insig_avg_df,
+  "Significant Proteins XL \nBorrero, Linke et al." = sig_xl_df, #sig_xl_df, sig_avg_df,
+  "Significant Proteins\n\u00d6zdemir et al." = sig_tom20,
+  "Insignificant Proteins\n\u00d6zdemir et al." = insig_tom20
+)
+
 venn <- ggvenn::ggvenn(
-  data = list("Borrero, Linke et al." = sig_avg_df,
-              "\u00d6zdemir et al." = sig_tom20),
-  fill_color = c("orange", "grey"),
+  data = protein_list,
+  fill_color = c("orange", "darkgreen", 'blue', 'purple'),
   show_percentage = FALSE,
   text_size = 8,
   fill_alpha = 0.8,
-  set_name_size = 5
-)
+  set_name_size = 5, 
+) +
+  labs(title=title) + 
+  theme(title = element_text(face = "bold", hjust = 0.5))
 
-ggsave(plot = venn, filename = "plots/venn_diagram.png")
-ggsave(plot = venn, filename = "plots/venn_diagram.pdf")
+venn
 
-intersect(sig_avg_df, sig_tom20)
-sig_avg_df[-which(sig_avg_df %in% sig_tom20)]
+# ggsave(plot = venn, filename = "plots/venn_diagram_v2.pdf", height = 7, width = 9)
+
+venn_data <- gplots::venn(protein_list)
+intersection_lists <- attr(venn_data, "intersections")
+intersection_lists[c(1:2,4,6:8)]
+
+genes <- intersection_lists[7] |> unlist() |> unname()
+table1 <- average_df |>
+  filter(Gene %in% genes) |>
+  select(Gene, avg_fc, p_allmv, p_allmv.adj)
+
+table2 <- tom20 |>
+  filter(Gene_corrected %in% genes) |>
+  select(Gene_corrected, `T-test Difference`, p.value)
+
+openxlsx::write.xlsx(list("Borrero, Linke et al." = table1,
+                          "\u00d6zdemir et al." = table2),
+                     file = "digging/protein_in_interest_XL.xlsx",
+                     keepNA=TRUE, na.string='NA')
 
 ######## Unused Code ########
 gene_names <- c(
