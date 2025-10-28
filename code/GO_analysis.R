@@ -25,6 +25,29 @@ mart <- useMart("ENSEMBL_MART_ENSEMBL", dataset = "hsapiens_gene_ensembl", versi
 uniprots <- Rkeys(org.Hs.egUNIPROT)
 ENSEMBL_ids <- AnnotationDbi::select(org.Hs.eg.db, uniprots, "ENSEMBL", "UNIPROT")
 
+################################### BOX PLOT ###################################
+# ONLY FOR MITO WITH HITS from the figure 3d
+
+hits <- c("FKBP8", "TIM17A", "TOM22", "COA7", "TOM40", "TIM23", "SDHA", "TOM70",
+          "TOM20", "MUL1", "ATP5B", "SAMM50", "VDAC1")
+hits <- HGNChelper::checkGeneSymbols(hits)$Suggested.Symbol
+
+box_plot <- fkbp8_kd |>
+  filter(`Gene names` %in% hits) |>
+  select(`Gene names`, contains("LFQ intensity M")) |>
+  pivot_longer(cols = contains("LFQ"), values_to = "LFQ", names_to = "TYPE") |>
+  mutate(TYPE = gsub("LFQ intensity M-", "", TYPE),
+         TYPE = gsub("-.*", "", TYPE),
+         TYPE = gsub("NT", "Control", TYPE)) |>
+  ggplot(aes(x = `Gene names`, y = LFQ, color = TYPE)) +
+  geom_boxplot() + 
+  theme_bw() +
+  theme(axis.title.x = element_blank())
+
+box_plot
+
+ggsave("plots2/box_plot_siFKBP8.pdf", plot = box_plot)
+
 ############################## GO TERM ENRICHMENT ##############################
 Entrez_ids <- AnnotationDbi::select(org.Hs.eg.db, uniprots, "ENTREZID", "UNIPROT")
 
@@ -162,6 +185,9 @@ p_go_heat_up_T
 ggsave("plots_GO/heatmap_up_TOTAL.pdf", plot = p_go_heat_up_T, width = 15, height = 7)
 
 ############################ ONE GO TERM ENRICHMENT ############################
+# ONLY MITOCHONDRIUM AND OTHER ADD ALSO THE HALF VIOLIN UNDER THE VOLCANO
+# COLOR THE MITOCHDONRIUM WITH DARK GREEN
+# LABEL SIG PROTEIN WHICH P < 0.05 AND |FC| > 1
 
 # Extracting necessary columns
 data_one_term <- fkbp8_kd |>
@@ -175,21 +201,15 @@ data_one_term <- fkbp8_kd |>
 
 # Creating a vector of needed GO terms and map vector
 this.GO.mito <- "GO:0005739" # Mitochondrium
-this.GO.er <- "GO:0005783" # ER
-this.GO.golgi <- "GO:0005794" # Golgi aparatus
-this.GO.lyso <- "GO:0005764" # Lysosome
-this.GO.perox <- "GO:0005777" # Peroxisome (cellular component)
-
-GO_terms <- c(this.GO.mito, this.GO.er, this.GO.golgi, this.GO.lyso, this.GO.perox)
-organelles <- c('Mitochondrium', 'Endoplasmatic Reticulum', 'Golgi aparatus', 'Lysosome', 'Peroxisome')
-names(organelles) <- GO_terms
+organelle <- "Mitochondrium"
+names(organelle) <- this.GO.mito
 
 # Retrieving all possible UNIPROT IDs for our GO terms
 retrieved <- AnnotationDbi::select(org.Hs.eg.db, keytype = "GOALL", 
-                                   keys = GO_terms, 
+                                   keys = this.GO.mito, 
                                    columns = c("ENSEMBL", "UNIPROT")) |>
   select(UNIPROT, GOALL) |>
-  mutate(Organelles = organelles[GOALL]) |> # mapping the GO IDs with the names
+  mutate(Organelles = organelle[GOALL]) |> # mapping the GO IDs with the names
   distinct(UNIPROT, Organelles) |> # Removing noise
   group_by(UNIPROT) |>
   mutate(Organelles = paste(Organelles, collapse = " | ")) |> # Collapsing more than 1 organelle
@@ -197,8 +217,7 @@ retrieved <- AnnotationDbi::select(org.Hs.eg.db, keytype = "GOALL",
 
 # Merging with our original dataset
 data_to_plot <- merge(data_one_term, retrieved, by = "UNIPROT", all.x = TRUE) |>
-  mutate(Organelles = replace_na(Organelles, "Other"),
-         Organelles2 = gsub(" \\|.*", "", Organelles)) |>
+  mutate(Organelles = replace_na(Organelles, "Other")) |>
   distinct()
 
 # Check if NA still exist
@@ -209,35 +228,61 @@ volcano_M <- ggplot() +
   theme_classic() +
   geom_vline(xintercept = c(-1,1), linetype = 'dashed', color = 'grey') +
   geom_hline(yintercept = -log10(0.05), linetype = 'dashed', color = 'grey') +
-  geom_point(data = subset(data_to_plot, Organelles2 == "Other"), aes(
+  geom_point(data = subset(data_to_plot, Organelles == "Other"), aes(
     x = `Log2FC M-siFKBP8 vs M-NT`,
     y = `-Log10 p-value M-siFKBP8 vs M-NT`,
-    color = Organelles2,
+    color = Organelles,
     label = `Gene names`)) +
-  geom_point(data = subset(data_to_plot, Organelles2 != "Other"), aes(
+  geom_point(data = subset(data_to_plot, Organelles != "Other"), aes(
     x = `Log2FC M-siFKBP8 vs M-NT`,
     y = `-Log10 p-value M-siFKBP8 vs M-NT`,
-    color = Organelles2,
+    color = Organelles,
     label = `Gene names`)) +
   ggrepel::geom_text_repel(data = subset(data_to_plot, sig_bool_M), aes(
     x = `Log2FC M-siFKBP8 vs M-NT`,
     y = `-Log10 p-value M-siFKBP8 vs M-NT`,
-    color = Organelles2,
+    color = Organelles,
     label = `Gene names`
   ), show.legend = F, max.overlaps = Inf, verbose = TRUE, min.segment.length = 0) +
   scale_color_manual("Organelles", values = c(
-    'Mitochondrium' = 'orange',
-    'Endoplasmatic Reticulum' = 'purple',
-    'Golgi aparatus' = 'blue',
-    'Lysosome' = 'magenta',
-    'Peroxisome' = 'darkgreen',
-    'Other' = 'grey'
-  ), breaks = c(organelles |> unname(), 'Other'),
-  labels = gsub(" ", "\n", c(organelles |> unname(), 'Other')))
+    'Mitochondrium' = 'darkgreen',
+    # 'Endoplasmatic Reticulum' = 'purple',
+    # 'Golgi aparatus' = 'blue',
+    # 'Lysosome' = 'magenta',
+    # 'Peroxisome' = 'darkgreen',
+    'Other' = 'darkgrey'
+  ), breaks = c(organelle |> unname(), 'Other'),
+  labels = gsub(" ", "\n", c(organelle |> unname(), 'Other'))) +
+  xlim(-3,3) +
+  theme(legend.position = c(0.97, 0.8),
+        legend.justification = c("right", "top"),
+        legend.box.just = "right")
 
 volcano_M
 
-ggsave("plots_GO/volcano_one_term_MITO.pdf", plot = volcano_M, height = 7)
+density_M <- data_to_plot |>
+  select(`Log2FC M-siFKBP8 vs M-NT`, Organelles) |>
+  ggplot() +
+  gghalves::geom_half_violin(aes(
+    y = `Log2FC M-siFKBP8 vs M-NT`, 
+    x = '', 
+    fill = Organelles),
+    position = "identity", draw_quantiles = 0.5, side = c('r', 'l')) + 
+  scale_fill_manual("", values=c("Mitochondrium" = "darkgreen",
+                             "Other" = "darkgrey")) +
+  guides(fill='none') +
+  theme_classic() +
+  theme(axis.ticks = element_blank(), axis.title = element_blank(),
+        axis.text = element_blank(), axis.line = element_blank()) +
+  coord_flip() +
+  ylim(-3,3)
+
+density_M
+
+merged_plot <- ggpubr::ggarrange(volcano_M, density_M, nrow = 2, heights = c(4,1),
+                                 align = 'v')
+
+ggsave("plots2/volcano_MITO.pdf", plot = merged_plot, height = 7)
 
 # TOTAL volcano plot
 volcano_T <- ggplot() +
