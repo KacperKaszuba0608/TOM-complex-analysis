@@ -23,7 +23,8 @@ dataset2 <- read_csv('./data/MB_triplicate_WT_FLAG-TOMM22 vs EV.csv', show_col_t
   dplyr::select(Gene_names, Detected_yeast, Log2_enrichment_FLAG_EV, Log10_pvalue_FLAG_EV,
          `Protein IDs`, `Data imputed in EV (if <2vv)`, Significant_FLAG_EV) |>
   mutate(`Data imputed in EV (if <2vv)` = ifelse(`Data imputed in EV (if <2vv)` == 'Yes', TRUE, FALSE),
-         Significant_FLAG_EV = ifelse(Significant_FLAG_EV == 'Yes', TRUE, FALSE))
+         Significant_FLAG_EV = ifelse(Significant_FLAG_EV == 'Yes', TRUE, FALSE),
+         Gene_names = HGNChelper::checkGeneSymbols(Gene_names)$Suggested.Symbol |> suppressMessages())
 
 dataset2_supp <- read.table("./data/raw_dataset2.txt", sep = "\t", header = TRUE) |>
   dplyr::select(Protein.IDs, Fasta.headers) 
@@ -39,7 +40,13 @@ tom20 <- readxl::read_xlsx("./data/Auswertung PR80 proteingroups.xlsx", sheet = 
   dplyr::select(`Gene names`, `T-test Difference`, `"-Log T-test p-value"`) |>
   dplyr::mutate(`Gene names` = gsub(";.*", "", `Gene names`),
     Gene_corrected = HGNChelper::checkGeneSymbols(`Gene names`)$Suggested.Symbol |> suppressMessages(),
-    Gene_corrected = gsub(" .*", "", Gene_corrected))
+    Gene_corrected = gsub(" .*", "", Gene_corrected)) |>
+  group_by(Gene_corrected) |>
+  mutate(p.value = 10^(-`"-Log T-test p-value"`)) |>
+  summarise(`T-test Difference` = mean(`T-test Difference`, na.rm = TRUE),
+            p.value = ifelse(length(p.value) > 1,
+                             pchisq(-2 * sum(log(p.value)), df=2*length(p.value), lower.tail = FALSE), 
+                             p.value))
 
 ############################### MITOCOP DATASET ################################
 
@@ -85,37 +92,12 @@ cleaned_data <- data_to_plot |>
   mutate(p_22.adj = p.adjust(p_22, method = "BH"),
   p_22_XL.adj = p.adjust(p_22_XL, method = "BH"),
   p_22_22_XL.adj = p.adjust(p_22_22_XL, method = "BH"),
-  annotate = ifelse(
-    ((FC_22_ev_XL >= 2.5 & FC_22_ev >= 2.5)) &
-      (TOMM22_XL + TOMM22_NA) > 45 | 
-      Gene == 'MUL1',
-    TRUE, FALSE
-  ),
   sig_22 = ifelse(FC_22_ev > 2 & p_22 < 0.05, TRUE, FALSE),
   sig_22_XL = ifelse(FC_22_ev_XL > 2 & p_22_XL < 0.05, TRUE, FALSE)
   ) |>
   separate(Protein.IDs, into=c('ID1', 'Simple_ID', 'ID3'), sep = '\\|') |>
   dplyr::select(-ID1, -ID3) |>
   filter(protein_names != "FLAG")
-# |>
-#   mutate(dataset2_id = sapply(Simple_ID, function(id) {
-#     matching_row <- sapply(dataset2$`Protein IDs`, function(id2) id %in% unlist(strsplit(id2, ";")))
-# 
-#     if (any(matching_row)) {
-#       return(dataset2$`Protein IDs`[which(matching_row)])
-#     } else {
-#       return(id)
-#     }
-#   })) |>
-#   mutate(mitocopies_id = sapply(Simple_ID, function(id) {
-#     matching_row <- sapply(mitocopies_df$`Protein IDs`, function(id2) id %in% unlist(strsplit(id2, ";")))
-#     
-#     if (any(matching_row)) {
-#       return(mitocopies_df$`Protein IDs`[which(matching_row)])
-#     } else {
-#       return(id)
-#     }
-#   }))
 
 cleaned_data <- cleaned_data[-which(duplicated(cleaned_data$protein_names)),]
 
@@ -145,7 +127,7 @@ UniProt <- AnnotationDbi::select(org.Hs.eg.db,
   ungroup() |> suppressMessages()
 
 dataset2 <- merge(dataset2, UniProt, by.x = "Gene_names", by.y = "SYMBOL", all.x = TRUE) |>
-  mutate(UNIPROT = ifelse(UNIPROT == "NA", `Protein IDs`, UNIPROT))
+  mutate(UNIPROT = ifelse(UNIPROT == "NA", gsub(";.*", "", `Protein IDs`), UNIPROT))
 
 # Annotating tom20 dataset
 UniProt <- AnnotationDbi::select(org.Hs.eg.db,
