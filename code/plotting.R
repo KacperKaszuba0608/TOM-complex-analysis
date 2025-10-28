@@ -30,24 +30,29 @@ combined_df <- combined_df |>
     (p_22.adj < 0.05 & FC_22_ev > FC.cutoff) | (pvalue_dataset2 < 0.05 & Log2_enrichment_FLAG_EV > FC.cutoff)  ~ "One Dataset",
     TRUE ~ "Not Significant"
   ),
-  annotate = ifelse(grepl("TOMM", Gene) & Gene != "TOMM34", TRUE, FALSE))
+  annotate = ifelse(grepl("TOMM", Gene) & Gene != "TOMM34", TRUE, FALSE),
+  transparency = ifelse(FC_22_ev < 0 & Log2_enrichment_FLAG_EV < 0, 0.2, 1))
 
-combined_plot <- main_plot +
+combined_plot <- ggplot() +
+  theme_classic() +
   geom_abline(slope = 1, intercept = 0, color = "green", linewidth = 1) +
   guides(linetype = guide_legend(override.aes = list(color = "green"))) +
-  geom_point(data = subset(combined_df, FC_22_ev >= 0 & Log2_enrichment_FLAG_EV >= 0), aes(
-    x = FC_22_ev,
-    y = Log2_enrichment_FLAG_EV,
-    color = is_significant,
-    label = Gene
-  )) +
-  scale_color_manual("Significant Class", values=c(
-      "Not Significant" = "grey",
-      "Both Datasets" = "darkgreen",
-      "One Dataset" = "darkgreen"),
-      breaks = c("Both Datasets", "One Dataset", "Not Significant")) +
+  geom_point(data = combined_df, #subset(combined_df, FC_22_ev >= 0 & Log2_enrichment_FLAG_EV >= 0), 
+             aes(
+               x = FC_22_ev,
+               y = Log2_enrichment_FLAG_EV,
+               color = ifelse(annotate, 'purple', 'black'),
+               alpha = transparency
+               )) +
+  scale_color_identity() +
+  scale_alpha_identity() +
+  # scale_color_manual("Significant Class", values=c(
+  #     "Not Significant" = "grey",
+  #     "Both Datasets" = "darkgreen",
+  #     "One Dataset" = "darkgreen"),
+  #     breaks = c("Both Datasets", "One Dataset", "Not Significant")) +
   geom_text_repel(data = subset(combined_df, annotate), mapping = aes(
-    x = FC_22_ev, y = Log2_enrichment_FLAG_EV, color = is_significant,
+    x = FC_22_ev, y = Log2_enrichment_FLAG_EV, color = 'purple',
     label = protein_names),
     verbose = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE
   ) + 
@@ -60,10 +65,10 @@ combined_plot <- main_plot +
     legend.box.just = "right",
     legend.spacing.y = unit(0, "cm")
     ) +
-  scale_x_continuous(limits = c(0, 12), breaks = c(0, 2, 4, 6, 8, 10, 1.5), 
-                     labels = c("0", "2", "4", "6", "8", "10", "1.5"), expand = c(0,0)) +
-  scale_y_continuous(limits = c(0, 12), breaks = c(0, 2, 4, 6, 8, 10, 1.5),
-                     labels = c("0", "2", "4", "6", "8", "10", "1.5"), expand = c(0,0)) + 
+  scale_x_continuous(limits = c(-4, 12), breaks = c(seq(-2,12,2), 1.5),
+                     labels = c(seq(-2,12,2), 1.5) |> as.character(), expand = c(0,0)) +
+  scale_y_continuous(limits = c(-4, 12), breaks = c(seq(-2,12,2), 1.5),
+                     labels = c(seq(-2,12,2), 1.5) |> as.character(), expand = c(0,0)) +
   guides(color = guide_legend(override.aes = list(lty = NA)))
 
 combined_plot
@@ -333,8 +338,7 @@ xlvsnxl_plot_v2 <- ggplot() +
     x = FC_22_ev_XL,
     y = FC_22_ev,
     color = `T-test Difference`,
-    shape = ifelse(is.na(`T-test Difference`), "No", "Yes"),
-    label = Gene
+    shape = ifelse(is.na(`T-test Difference`), "No", "Yes")
   )) +
   geom_text_repel(data = subset(xlvsnxl_DF, annotate), mapping = aes(
     y = FC_22_ev, x = FC_22_ev_XL, color = `T-test Difference`,
@@ -362,7 +366,7 @@ xlvsnxl_plot_v2 <- ggplot() +
 # xlvsnxl_plot_v2
 # ggplotly(xlvsnxl_plot_v2)
 
-xlvsnxl_dens_plot <- ggplot(data = subset(xlvsnxl_DF, `T-test Difference` > 3)) +
+xlvsnxl_dens_plot <- ggplot(data = subset(xlvsnxl_DF, `T-test Difference` > 1.5)) +
   theme_classic() +
   geom_hline(yintercept = 3, color = "grey", linetype = "dashed") +
   geom_density(mapping = aes(y = FC_22_ev), fill = 'orange', alpha = 0.5, color = "orange") +
@@ -376,7 +380,7 @@ xlvsnxl_dens_plot <- ggplot(data = subset(xlvsnxl_DF, `T-test Difference` > 3)) 
 xlvsnxl_plot <- ggpubr::ggarrange(xlvsnxl_plot_v2, xlvsnxl_dens_plot, ncol = 2, widths = c(4.5,1))
 # xlvsnxl_plot
 
-ggsave(plot = xlvsnxl_plot, filename = "plots2/figure_5A_V2.pdf", width = 8.5, height = 8.5)
+ggsave(plot = xlvsnxl_plot, filename = "plots2/figure_5A_V3.pdf", width = 8.5, height = 8.5)
 
 ############################### FIGURE 5 ###############################
 boost.cutoff <- 1
@@ -913,19 +917,19 @@ insig_tom20 <- tom20 |>
   select(Gene_corrected) |> separate_rows(Gene_corrected, sep = ";") |> pull()
 
 # Prepare a Venn Diagram
-title = paste0("Borrero, Linke et al.: FC-XL cutoff = ", FC.cutoff_avg |> round(2),
+title = paste0("Borrero, Linke et al.: FC cutoff = ", FC.cutoff_avg |> round(2),
                "\n\u00d6zdemir et al.: FC cutoff = ", FC.cutoff_tom20 |> round(2))
 
 protein_list <- list(
-  "Insignificant Proteins XL\nBorrero, Linke et al." = insig_xl_df, #insig_xl_df, insig_avg_df,
-  "Significant Proteins XL\nBorrero, Linke et al." = sig_xl_df, #sig_xl_df, sig_avg_df,
+  "Insignificant Proteins\nBorrero, Linke et al." = insig_avg_df, #insig_xl_df, insig_avg_df,
+  "Significant Proteins\nBorrero, Linke et al." = sig_avg_df, #sig_xl_df, sig_avg_df,
   "Significant Proteins\n\u00d6zdemir et al." = sig_tom20,
   "Insignificant Proteins\n\u00d6zdemir et al." = insig_tom20
 )
 
 venn <- ggvenn::ggvenn(
   data = protein_list,
-  fill_color = c("grey", "grey", 'darkblue', 'purple'),
+  fill_color = c("lightgrey", "orange", '#4975C6', 'skyblue'),
   stroke_color = c("orange", "orange", "black", "black"),
   show_percentage = FALSE,
   text_size = 8,
@@ -937,11 +941,11 @@ venn <- ggvenn::ggvenn(
 
 venn
 
-ggsave(plot = venn, filename = "plots2/venn_diagram_XL.pdf", height = 7, width = 9)
+ggsave(plot = venn, filename = "plots2/venn_diagram_noXL.pdf", height = 7, width = 9)
 
-venn_data <- gplots::venn(protein_list)
+venn_data <- gplots::venn(protein_list, show.plot = FALSE)
 intersection_lists <- attr(venn_data, "intersections")
-intersection_lists[c(1:2,4,6:8)]
+intersection_lists[c(3,7)]
 
 genes <- intersection_lists[6] |> unlist() |> unname()
 table1 <- average_df |>
