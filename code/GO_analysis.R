@@ -25,28 +25,35 @@ mart <- useMart("ENSEMBL_MART_ENSEMBL", dataset = "hsapiens_gene_ensembl", versi
 uniprots <- Rkeys(org.Hs.egUNIPROT)
 ENSEMBL_ids <- AnnotationDbi::select(org.Hs.eg.db, uniprots, "ENSEMBL", "UNIPROT")
 
-################################### BOX PLOT ###################################
+################################### BAR PLOT ###################################
 # ONLY FOR MITO WITH HITS from the figure 3d
 
 hits <- c("FKBP8", "TIM17A", "TOM22", "COA7", "TOM40", "TIM23", "SDHA", "TOM70",
-          "TOM20", "MUL1", "ATP5B", "SAMM50", "VDAC1")
-hits <- HGNChelper::checkGeneSymbols(hits)$Suggested.Symbol
+          "TOM20", "MUL1", "ATP5B", "SAMM50", "VDAC1", 
+          fkbp8_kd[grep("TOMM", fkbp8_kd$`Gene names`), "Gene names"] |> pull())
+hits <- HGNChelper::checkGeneSymbols(hits)$Suggested.Symbol |> unique()
 
-box_plot <- fkbp8_kd |>
-  filter(`Gene names` %in% hits) |>
-  select(`Gene names`, contains("LFQ intensity M")) |>
-  pivot_longer(cols = contains("LFQ"), values_to = "LFQ", names_to = "TYPE") |>
-  mutate(TYPE = gsub("LFQ intensity M-", "", TYPE),
-         TYPE = gsub("-.*", "", TYPE),
-         TYPE = gsub("NT", "Control", TYPE)) |>
-  ggplot(aes(x = `Gene names`, y = LFQ, color = TYPE)) +
-  geom_boxplot() + 
+bar_plot <- fkbp8_kd |>
+  filter(`Gene names` %in% hits & `Gene names` != "TOMM34") |>
+  select(`Gene names`, `Log2FC M-siFKBP8 vs M-NT`, contains("LFQ intensity M-si")) |>
+  mutate(sd = lapply(seq_along(`Gene names`), function(i) {
+    v1 <- .data[["LFQ intensity M-siFKBP8-1"]][i]
+    v2 <- .data[["LFQ intensity M-siFKBP8-2"]][i]
+    v3 <- .data[["LFQ intensity M-siFKBP8-3"]][i]
+    sd(c(v1,v2,v3))
+    
+  }) |> unlist()) |>
+  ggplot(aes(y = reorder(`Gene names`, -`Log2FC M-siFKBP8 vs M-NT`),
+             x = `Log2FC M-siFKBP8 vs M-NT`)) +
+  geom_bar(stat = "identity") +
+  geom_errorbar(aes(xmin = `Log2FC M-siFKBP8 vs M-NT` - sd, xmax = `Log2FC M-siFKBP8 vs M-NT` + sd),
+                width = 0.5) +
   theme_bw() +
-  theme(axis.title.x = element_blank())
+  theme(axis.title.y = element_blank())
 
-box_plot
+bar_plot
 
-ggsave("plots2/box_plot_siFKBP8.pdf", plot = box_plot)
+ggsave("plots2/bar_plot_siFKBP8.pdf", plot = bar_plot, width = 5, height = 7)
 
 ############################## GO TERM ENRICHMENT ##############################
 Entrez_ids <- AnnotationDbi::select(org.Hs.eg.db, uniprots, "ENTREZID", "UNIPROT")
@@ -217,7 +224,9 @@ retrieved <- AnnotationDbi::select(org.Hs.eg.db, keytype = "GOALL",
 
 # Merging with our original dataset
 data_to_plot <- merge(data_one_term, retrieved, by = "UNIPROT", all.x = TRUE) |>
-  mutate(Organelles = replace_na(Organelles, "Other")) |>
+  mutate(Organelles = replace_na(Organelles, "Other"),
+         transparency_M = ifelse(sig_bool_M, 1, 0.2),
+         transparency_T = ifelse(sig_bool_T, 1, 0.2)) |>
   distinct()
 
 # Check if NA still exist
@@ -232,18 +241,19 @@ volcano_M <- ggplot() +
     x = `Log2FC M-siFKBP8 vs M-NT`,
     y = `-Log10 p-value M-siFKBP8 vs M-NT`,
     color = Organelles,
-    label = `Gene names`)) +
+    alpha = transparency_M)) +
   geom_point(data = subset(data_to_plot, Organelles != "Other"), aes(
     x = `Log2FC M-siFKBP8 vs M-NT`,
     y = `-Log10 p-value M-siFKBP8 vs M-NT`,
     color = Organelles,
-    label = `Gene names`)) +
+    alpha = transparency_M)) +
   ggrepel::geom_text_repel(data = subset(data_to_plot, sig_bool_M), aes(
     x = `Log2FC M-siFKBP8 vs M-NT`,
     y = `-Log10 p-value M-siFKBP8 vs M-NT`,
     color = Organelles,
     label = `Gene names`
   ), show.legend = F, max.overlaps = Inf, verbose = TRUE, min.segment.length = 0) +
+  scale_alpha_identity() +
   scale_color_manual("Organelles", values = c(
     'Mitochondrium' = 'darkgreen',
     # 'Endoplasmatic Reticulum' = 'purple',
@@ -254,18 +264,20 @@ volcano_M <- ggplot() +
   ), breaks = c(organelle |> unname(), 'Other'),
   labels = gsub(" ", "\n", c(organelle |> unname(), 'Other'))) +
   xlim(-3,3) +
-  theme(legend.position = c(0.97, 0.8),
+  theme(legend.position = c(0.4, 1),
         legend.justification = c("right", "top"),
-        legend.box.just = "right")
+        legend.box.just = "right",
+        legend.background = element_blank()) +
+  guides(alpha = 'none')
 
-volcano_M
+# volcano_M
 
 density_M <- data_to_plot |>
   select(`Log2FC M-siFKBP8 vs M-NT`, Organelles) |>
   ggplot() +
   gghalves::geom_half_violin(aes(
     y = `Log2FC M-siFKBP8 vs M-NT`, 
-    x = '', 
+    x = '1', 
     fill = Organelles),
     position = "identity", draw_quantiles = 0.5, side = c('r', 'l')) + 
   scale_fill_manual("", values=c("Mitochondrium" = "darkgreen",
@@ -274,50 +286,80 @@ density_M <- data_to_plot |>
   theme_classic() +
   theme(axis.ticks = element_blank(), axis.title = element_blank(),
         axis.text = element_blank(), axis.line = element_blank()) +
-  coord_flip() +
-  ylim(-3,3)
+  ylim(-3,3) +
+  coord_flip()
 
-density_M
+# density_M
 
 merged_plot <- ggpubr::ggarrange(volcano_M, density_M, nrow = 2, heights = c(4,1),
                                  align = 'v')
 
-ggsave("plots2/volcano_MITO.pdf", plot = merged_plot, height = 7)
+ggsave("plots2/volcano_MITO.pdf", plot = merged_plot, width = 4, height = 6)
 
 # TOTAL volcano plot
 volcano_T <- ggplot() +
   theme_classic() +
   geom_vline(xintercept = c(-1,1), linetype = 'dashed', color = 'grey') +
   geom_hline(yintercept = -log10(0.05), linetype = 'dashed', color = 'grey') +
-  geom_point(data = subset(data_to_plot, Organelles2 == "Other"), aes(
+  geom_point(data = subset(data_to_plot, Organelles == "Other"), aes(
     x = `Log2FC T-siFKBP8 vs T-NT`,
     y = `-Log10 p-value T-siFKBP8 vs T-NT`,
-    color = Organelles2,
-    label = `Gene names`)) +
-  geom_point(data = subset(data_to_plot, Organelles2 != "Other"), aes(
+    color = Organelles,
+    alpha = transparency_T)) +
+  geom_point(data = subset(data_to_plot, Organelles != "Other"), aes(
     x = `Log2FC T-siFKBP8 vs T-NT`,
     y = `-Log10 p-value T-siFKBP8 vs T-NT`,
-    color = Organelles2,
-    label = `Gene names`)) +
+    color = Organelles,
+    alpha = transparency_T)) +
   ggrepel::geom_text_repel(data = subset(data_to_plot, sig_bool_T), aes(
     x = `Log2FC T-siFKBP8 vs T-NT`,
     y = `-Log10 p-value T-siFKBP8 vs T-NT`,
-    color = Organelles2,
+    color = Organelles,
     label = `Gene names`
   ), show.legend = F, max.overlaps = Inf, verbose = TRUE, min.segment.length = 0) +
+  scale_alpha_identity() +
   scale_color_manual("Organelles", values = c(
-    'Mitochondrium' = 'orange',
-    'Endoplasmatic Reticulum' = 'purple',
-    'Golgi aparatus' = 'blue',
-    'Lysosome' = 'magenta',
-    'Peroxisome' = 'darkgreen',
-    'Other' = 'grey'
-  ), breaks = c(organelles |> unname(), 'Other'),
-  labels = gsub(" ", "\n", c(organelles |> unname(), 'Other')))
+    'Mitochondrium' = 'darkgreen',
+    # 'Endoplasmatic Reticulum' = 'purple',
+    # 'Golgi aparatus' = 'blue',
+    # 'Lysosome' = 'magenta',
+    # 'Peroxisome' = 'darkgreen',
+    'Other' = 'darkgrey'
+  ), breaks = c(organelle |> unname(), 'Other'),
+  labels = gsub(" ", "\n", c(organelle |> unname(), 'Other'))) +
+  xlim(-5.5, 4) +
+  theme(legend.position = c(0.4, 1),
+        legend.justification = c("right", "top"),
+        legend.box.just = "right",
+        legend.background = element_blank()) +
+  guides(alpha = 'none')
 
-volcano_T
+# volcano_T
+# ggsave("plots_GO/volcano_one_term_TOTAL.pdf", plot = volcano_T, height = 7)
 
-ggsave("plots_GO/volcano_one_term_TOTAL.pdf", plot = volcano_T, height = 7)
+density_T <- data_to_plot |>
+  select(`Log2FC T-siFKBP8 vs T-NT`, Organelles) |>
+  ggplot() +
+  gghalves::geom_half_violin(aes(
+    y = `Log2FC T-siFKBP8 vs T-NT`, 
+    x = '', 
+    fill = Organelles),
+    position = "identity", draw_quantiles = 0.5, side = c('r', 'l')) + 
+  scale_fill_manual("", values=c("Mitochondrium" = "darkgreen",
+                                 "Other" = "darkgrey")) +
+  guides(fill='none') +
+  theme_classic() +
+  theme(axis.ticks = element_blank(), axis.title = element_blank(),
+        axis.text = element_blank(), axis.line = element_blank()) +
+  coord_flip() +
+  ylim(-5.5,4)
+
+# density_T
+
+merged_plot_T <- ggpubr::ggarrange(volcano_T, density_T, nrow = 2, heights = c(4,1),
+                                 align = 'v')
+
+ggsave("plots2/volcano_TOTAL.pdf", plot = merged_plot_T, width = 4, height = 6)
 
 # SPLIT VIOLIN PLOT
 data_to_plot_copy <- data_to_plot |>
