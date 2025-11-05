@@ -5,7 +5,7 @@ library(biomaRt) |> suppressMessages()
 library(enrichplot) |> suppressMessages()
 library(clusterProfiler) |> suppressMessages()
 
-############################### GO TERM ANALYSIS ###############################
+################################ FKBP8 ANALYSIS ################################
 
 # Reading in the data
 fkbp8_kd <- vroom::vroom("./data/ProteinGroups_Mayra-sep2025-revision.txt", show_col_types = FALSE)
@@ -24,6 +24,30 @@ data_total <- fkbp8_kd |>
 mart <- useMart("ENSEMBL_MART_ENSEMBL", dataset = "hsapiens_gene_ensembl", version = "Ensembl Genes 115")
 uniprots <- Rkeys(org.Hs.egUNIPROT)
 ENSEMBL_ids <- AnnotationDbi::select(org.Hs.eg.db, uniprots, "ENSEMBL", "UNIPROT")
+
+################################## EXPLORING ###################################
+
+mitocarta <- vroom::vroom("./data/Human.MitoCarta3.0.csv", show_col_types = FALSE) |>
+  select(UniProt, MitoCarta3.0_List) |>
+  filter(UniProt != 0)
+
+df_explor <- fkbp8_kd |>
+  select(`Gene names`, `Protein IDs`, `Log2FC M-siFKBP8 vs M-NT`, `Log2FC T-siFKBP8 vs T-NT`, `MitoCarta3.0 SubMito Localization`)
+
+df_explor$UniProt <- gsub(";", "|", df_explor$`Protein IDs`)
+
+df_explor <- mitocarta |>
+  fuzzyjoin::fuzzy_right_join(df_explor, by = c("UniProt" = "UniProt"),
+                              match_fun = str_detect)
+
+df_explor <- df_explor |>
+  filter(!is.na(MitoCarta3.0_List)) |>
+  mutate(fc_diff = `Log2FC M-siFKBP8 vs M-NT` - `Log2FC T-siFKBP8 vs T-NT`) |>
+  dplyr::arrange(desc(abs(fc_diff)))
+
+df_explor |>
+  select(`Gene names`, `Log2FC M-siFKBP8 vs M-NT`, `Log2FC T-siFKBP8 vs T-NT`, fc_diff, `MitoCarta3.0 SubMito Localization`) |>
+  write.csv("mito_diff.csv", row.names = FALSE)
 
 ################################ SUBMITO VIOLIN ################################
 data_to_violin <- fkbp8_kd |>
