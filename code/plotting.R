@@ -463,7 +463,7 @@ stochiometric_df <- merge(cleaned_data, mitocopies_df, by = "UNIPROT", all.x = T
            TRUE ~ "Null value"
          ),
          is_significant = ifelse(p_22_XL.adj < 0.05, TRUE, FALSE),
-         annotate = ifelse(FC_22_ev_XL >= 3 & is_significant #& mito_copies_class != "Null value" 
+         annotate = ifelse(FC_22_ev_XL >= 3 & is_significant
                            | Gene %in% c("TOMM40L")
                            , TRUE, FALSE))
 
