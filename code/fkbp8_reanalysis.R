@@ -115,6 +115,19 @@ imputed_MITO <- impute(
   retain_columns = missingness_protti
 )
 
+# Imputation of MNAR proteins
+mnar_data <- imputed_MITO |>
+  filter(missingness_ours == "MNAR")
+
+mnar_data <- impute_data(mnar_data, col = "LFQvalue") |>
+  select(`Protein IDs`, Sample, LFQvalue)
+
+imputed_MITO <- merge(imputed_MITO, mnar_data, by=c("Protein IDs", "Sample"), all.x=TRUE)
+
+imputed_MITO <- imputed_MITO |>
+  mutate(imputed_intensity = ifelse(is.na(LFQvalue.x) & missingness_ours == "MNAR", LFQvalue.y, imputed_intensity)) |>
+  select(-LFQvalue.y)
+
 # Imputation using TOTAL cells
 lfq_T.miss <- lfq_T.clean |>
   mutate(prot.id = paste("prot",1:nrow(lfq_T.clean),sep="_")) |>
@@ -157,20 +170,18 @@ imputed_TOTAL <- impute(
   retain_columns = missingness_protti
 )
 
-rm(missingness, temp)
+# Imputation of MNAR proteins
+mnar_data <- imputed_TOTAL |>
+  filter(missingness_ours == "MNAR")
 
-# Check density
-imputed_MITO |>
-  ggplot(aes(x = imputed_intensity, fill = imputed)) +
-  geom_histogram()
+mnar_data <- impute_data(mnar_data, col = "LFQvalue") |>
+  select(`Protein IDs`, Sample, LFQvalue)
 
-imputed_TOTAL |>
-  ggplot(aes(x = imputed_intensity, fill = imputed)) +
-  geom_histogram()
+imputed_TOTAL <- merge(imputed_TOTAL, mnar_data, by=c("Protein IDs", "Sample"), all.x=TRUE) |>
+  mutate(imputed_intensity = ifelse(is.na(LFQvalue.x) & missingness_ours == "MNAR", LFQvalue.y, imputed_intensity)) |>
+  select(-LFQvalue.y)
 
-# Check normality
-qqnorm(imputed_TOTAL$imputed_intensity)
-qqline(imputed_TOTAL$imputed_intensity)
+rm(missingness, temp, mnar_data)
 
 # Fold Change MITO
 colnames(imputed_MITO)[8] <- "LFQ"
@@ -185,7 +196,7 @@ means <- imputed_MITO |>
 imputed_MITO <- merge(imputed_MITO, means, by="Protein IDs") 
 
 lfq_M.to_plot <- imputed_MITO |>
-  select(-LFQvalue, -sampletype) |>
+  select(-LFQvalue.x, -sampletype) |>
   pivot_wider(id_cols=everything(), names_from = Sample, values_from = c(imputed, LFQ))
 
 lfq_M.to_plot <- lfq_M.to_plot |>
@@ -213,7 +224,7 @@ means <- imputed_TOTAL |>
 imputed_TOTAL <- merge(imputed_TOTAL, means, by="Protein IDs") 
 
 lfq_T.to_plot <- imputed_TOTAL |>
-  select(-LFQvalue, -sampletype) |>
+  select(-LFQvalue.x, -sampletype) |>
   pivot_wider(id_cols=everything(), names_from = Sample, values_from = c(imputed, LFQ))
 
 lfq_T.to_plot <- lfq_T.to_plot |>
@@ -228,14 +239,19 @@ lfq_T.to_plot <- lfq_T.to_plot |>
 
 lfq_T.to_plot <- merge(lfq_T.to_plot, metadata[c("Protein IDs", "Gene names")], by = "Protein IDs", all.x = TRUE)
 
+################################### PLOTTING ###################################
 # Volcano MITO
 lfq_M.to_plot <- lfq_M.to_plot |>
   mutate(UniProt = gsub(";", "|", `Protein IDs`))
 
 to_volcano_M <- mitocarta |>
   fuzzyjoin::fuzzy_right_join(lfq_M.to_plot, by=c("UniProt" = "UniProt"),
-                              match_fun = str_detect) |>
-  mutate(annotate = ifelse(p.adj < 0.05 & abs(log2FC) > 1, TRUE, FALSE))
+                              match_fun = str_detect) 
+
+to_volcano_M <- to_volcano_M |>
+  mutate(annotate = ifelse(p.value < 0.05 & abs(log2FC) > 1 | # p.adj p.value
+                             `Gene names` == "FKBP8" |
+                             grepl("TOMM", `Gene names`) & `Gene names` != "TOMM34", TRUE, FALSE))
 
 volcano_M <- to_volcano_M |>
   ggplot() +
@@ -245,29 +261,35 @@ volcano_M <- to_volcano_M |>
   geom_point(data = subset(to_volcano_M, is.na(MitoCarta3.0_List)), 
              aes(
                x = log2FC, 
-               y = -log10(p.value), 
-               color = MitoCarta3.0_List,
+               # y = -log10(p.value),
+               y = -log10(p.adj),
+               color = MitoCarta3.0_List, #MitoCarta3.0_List, #missingness_ours,
                shape = imputed)) +
   geom_point(data = subset(to_volcano_M, !is.na(MitoCarta3.0_List)), 
              aes(
                x = log2FC, 
-               y = -log10(p.value), 
-               color = MitoCarta3.0_List,
+               # y = -log10(p.value), 
+               y = -log10(p.adj),
+               color = MitoCarta3.0_List, #MitoCarta3.0_List, #missingness_ours,
                shape = imputed)) +
   ggrepel::geom_text_repel(data = subset(to_volcano_M, annotate), 
                            aes(
                              x = log2FC,
-                             y = -log10(p.value),
-                             color = MitoCarta3.0_List,
+                             # y = -log10(p.value),
+                             y = -log10(p.adj),
+                             color = MitoCarta3.0_List, #MitoCarta3.0_List, #missingness_ours,
                              label = `Gene names`
                            ),
                            inherit.aes = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE) +
   scale_color_manual("", values=c("MitoCarta3.0" = "darkgreen", "NA" = "darkgrey")) +
-  scale_shape_manual("Imputed", values = c("TRUE"=1, "FALSE"=16))
+  scale_shape_manual("Imputed", values = c("TRUE"=1, "FALSE"=16)) +
+  # labs(subtitle = "Labeled p.adj < 0.05, FKBP8 and TOMs")
+  labs(subtitle = "Labeled p.value < 0.05, FKBP8 and TOMs")
 
 volcano_M
 
-# ggsave("./plots_fkbp/volcano_M.pdf", plot=volcano_M)
+# ggsave("./plots_fkbp/volcano_M_v1.pdf", plot=volcano_M)
+ggsave("./plots_fkbp/volcano_M_v2.pdf", plot=volcano_M)
 
 # Volcano TOTAL
 lfq_T.to_plot <- lfq_T.to_plot |>
@@ -275,8 +297,12 @@ lfq_T.to_plot <- lfq_T.to_plot |>
 
 to_volcano_T <- mitocarta |>
   fuzzyjoin::fuzzy_right_join(lfq_T.to_plot, by=c("UniProt" = "UniProt"),
-                              match_fun = str_detect) |>
-  mutate(annotate = ifelse(p.adj < 0.05 & abs(log2FC) > 1, TRUE, FALSE))
+                              match_fun = str_detect)
+
+to_volcano_T <- to_volcano_T |>
+  mutate(annotate = ifelse(p.value < 0.05 & abs(log2FC) > 1 | # p.adj p.value
+                             `Gene names` == "FKBP8" |
+                             grepl("TOMM", `Gene names`) & `Gene names` != "TOMM34", TRUE, FALSE))
 
 volcano_T <- to_volcano_T |>
   ggplot() +
@@ -286,54 +312,172 @@ volcano_T <- to_volcano_T |>
   geom_point(data = subset(to_volcano_T, is.na(MitoCarta3.0_List)), 
              aes(
                x = log2FC, 
-               y = -log10(p.value), 
-               color = MitoCarta3.0_List,
+               # y = -log10(p.value),
+               y = -log10(p.adj),
+               color = MitoCarta3.0_List, #MitoCarta3.0_List, #missingness_ours,
                shape = imputed)) +
   geom_point(data = subset(to_volcano_T, !is.na(MitoCarta3.0_List)), 
              aes(
                x = log2FC, 
-               y = -log10(p.value), 
-               color = MitoCarta3.0_List,
+               # y = -log10(p.value),
+               y = -log10(p.adj),
+               color = MitoCarta3.0_List, #MitoCarta3.0_List, #missingness_ours,
                shape = imputed)) +
   ggrepel::geom_text_repel(data = subset(to_volcano_T, annotate), 
                            aes(
                              x = log2FC,
-                             y = -log10(p.value),
-                             color = MitoCarta3.0_List,
+                             # y = -log10(p.value),
+                             y = -log10(p.adj),
+                             color = MitoCarta3.0_List, #MitoCarta3.0_List, #missingness_ours,
                              label = `Gene names`
                            ),
                            inherit.aes = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE) +
   scale_color_manual("", values=c("MitoCarta3.0" = "darkgreen", "NA" = "darkgrey")) +
-  scale_shape_manual("Imputed", values = c("TRUE"=1, "FALSE"=16))
+  scale_shape_manual("Imputed", values = c("TRUE"=1, "FALSE"=16)) +
+  # labs(subtitle = "Labeled p.adj < 0.05, FKBP8 and TOMs")
+  labs(subtitle = "Labeled p.value < 0.05, FKBP8 and TOMs")
 
 volcano_T
 
-# ggsave("./plots_fkbp/volcano_T.pdf", plot=volcano_T)
+# ggsave("./plots_fkbp/volcano_T_v1.pdf", plot=volcano_T)
+ggsave("./plots_fkbp/volcano_T_v2.pdf", plot=volcano_T)
 
+################################ SUBMITO VIOLIN ################################
+data_to_violin <- merge(lfq_M.to_plot |> select(`Protein IDs`, `Gene names`, log2FC), 
+                        lfq_T.to_plot |> select(`Protein IDs`, `Gene names`, log2FC), 
+                        by = c("Protein IDs", "Gene names"), all = TRUE, suffixes = c("_M", "_T")) |>
+  mutate(UniProt = gsub(";", "|", `Protein IDs`)) |>
+  fuzzyjoin::fuzzy_left_join(mitocarta, by = c("UniProt"="UniProt"), match_fun = str_detect) |>
+  select(`Gene names`, log2FC_M, log2FC_T, MitoCarta3.0_SubMitoLocalization) |>
+  pivot_longer(cols = 2:3, names_to = "Batch", values_to = "FC") 
 
+data_to_violin <- data_to_violin |>
+  mutate(MitoCarta3.0_SubMitoLocalization = case_when(
+    MitoCarta3.0_SubMitoLocalization |> is.na() |
+      MitoCarta3.0_SubMitoLocalization == "unknown" ~ "Other",
+    TRUE ~ MitoCarta3.0_SubMitoLocalization),
+         colors = case_when(
+           MitoCarta3.0_SubMitoLocalization == "IMS" ~ "firebrick",
+           MitoCarta3.0_SubMitoLocalization == "Matrix" ~ "orange",
+           MitoCarta3.0_SubMitoLocalization == "Membrane" ~ "#8151A0",
+           MitoCarta3.0_SubMitoLocalization == "MIM" ~ "red",
+           MitoCarta3.0_SubMitoLocalization == "MOM" ~ "#3954A4",
+           MitoCarta3.0_SubMitoLocalization == "Other" ~ "#484a4d",
+           TRUE ~ "grey"
+         ))
 
+mito_prot <- c("MT-CO1", "MT-ATP8", "MT-CO2", "MT-ND1")
 
+# Calculate the outlier thresholds for each group
+outlier_thresholds <- data_to_violin |>
+  group_by(MitoCarta3.0_SubMitoLocalization) |>
+  summarise(
+    mean = mean(FC, na.rm = TRUE),
+    sd = sd(FC, na.rm = TRUE),
+    .groups = 'drop'
+  )
 
+# Join these thresholds back and filter main data
+outlier_data <- data_to_violin |>
+  left_join(outlier_thresholds, by = "MitoCarta3.0_SubMitoLocalization") |>
+  filter((abs(FC - mean) > 2 * sd & MitoCarta3.0_SubMitoLocalization != 'Other') |
+           (`Gene names` %in% mito_prot & !is.na(FC)) |
+           (grepl("TOMM", `Gene names`) & `Gene names` != "TOMM34" & !is.na(FC))) |>
+  mutate(order = case_when(
+    MitoCarta3.0_SubMitoLocalization == "Matrix" ~ 1,
+    MitoCarta3.0_SubMitoLocalization == "IMS" ~ 2,
+    MitoCarta3.0_SubMitoLocalization == "MIM" ~ 3,
+    MitoCarta3.0_SubMitoLocalization == "Membrane" ~ 4,
+    MitoCarta3.0_SubMitoLocalization == "MOM" ~ 5,
+    TRUE ~ 6
+  ))
 
+submito_violin <- ggplot() +
+  theme_classic() +
+  geom_abline(intercept = 0, slope = 0, linetype = "dashed", color = "darkgrey") +
+  annotate("rect", ymin = -1, ymax = 1, xmin = -Inf, xmax = Inf, fill = "grey", alpha = 0.5) +
+  geom_text(aes(x = 6.1, y = 1.1, label = "Whole Cell Lysates", color="#484a4d"), hjust=0) +
+  geom_text(aes(x = 5.9, y = 1.1, label = "Mitochondrial fractions", color="#484a4d"), alpha = 0.5, hjust=0) +
+  gghalves::geom_half_violin(data = data_to_violin,
+    aes(
+      x = MitoCarta3.0_SubMitoLocalization,
+      y = FC,
+      split = Batch,
+      fill = colors,
+      colour = ifelse(Batch == "log2FC_M", colors, 'black'),
+      alpha = ifelse(Batch == "log2FC_M", 0.5, 1)
+    ),
+    position = "identity", draw_quantiles = 0.5, show.legend = FALSE) +
+  geom_jitter(data = filter(outlier_data, Batch != "log2FC_M"),
+              aes(
+                x = MitoCarta3.0_SubMitoLocalization,
+                y = FC,
+                colour = "black",
+                alpha = 1), 
+              position = position_nudge(x = 0.1), show.legend = FALSE) +
+  geom_jitter(data = filter(outlier_data, Batch == "log2FC_M"),
+              aes(
+                x = MitoCarta3.0_SubMitoLocalization,
+                y = FC,
+                colour = colors,
+                alpha = 0.5),
+              position = position_nudge(x = -0.1), show.legend = FALSE) +
+  ggrepel::geom_text_repel(data = filter(outlier_data, Batch != "log2FC_M"),
+                           aes(
+                             x = order + 0.1,
+                             y = FC,
+                             label = `Gene names`,
+                             color = "black"), nudge_x = 0.17,
+                           show.legend = FALSE, max.overlaps = Inf, min.segment.length = 0) +
+  ggrepel::geom_text_repel(data = filter(outlier_data, Batch == "log2FC_M"),
+                           aes(
+                             x = order - 0.1,
+                             y = FC,
+                             label = `Gene names`,
+                             color = colors), nudge_x = -0.17,
+                           show.legend = FALSE, max.overlaps = Inf, min.segment.length = 0) +
+  scale_alpha_identity() +
+  scale_color_identity() +
+  scale_fill_identity() +
+  coord_flip() +
+  theme(axis.title.y = element_blank()) +
+  labs(y = "log2FC siFKBP8/Ctrl (n=3), Dataset 5 (tops) and Dataset 6 (bottoms)") +
+  scale_x_discrete(limits = c("Matrix", "IMS", "MIM", "Membrane", "MOM", "Other"))
 
-to_volcano_T |>
-  filter(`Gene names` %in% c("FKBP8", "USP30", "BCL2L11")) |>
-  select(`Gene names`, contains("LFQ"), imputed, missingness_ours) |> View()
+# submito_violin
 
+ggsave("plots_fkbp//split_violin_fkbp8_submito.pdf", plot = submito_violin, width = 10, height = 10)
 
+################################### BAR PLOT ###################################
+# ONLY FOR MITO WITH HITS from the figure 3d
 
+hits <- c("FKBP8", "TIM17A", "TOM22", "COA7", "TOM40", "TIM23", "SDHA", "TOM70",
+          "TOM20", "MUL1", "ATP5B", "SAMM50", "VDAC1", 
+          lfq_M.to_plot[grepl("TOMM", lfq_M.to_plot$`Gene names`), "Gene names"])
+hits <- HGNChelper::checkGeneSymbols(hits)$Suggested.Symbol |> unique()
 
+bar_plot <- lfq_M.to_plot |>
+  filter(`Gene names` %in% hits & `Gene names` != "TOMM34") |>
+  select(`Gene names`, log2FC, contains("LFQ")) |>
+  mutate(sd = lapply(seq_along(`Gene names`), function(i) {
+    v1 <- .data[["LFQ_M_siFKBP8-1"]][i]
+    v2 <- .data[["LFQ_M_siFKBP8-2"]][i]
+    v3 <- .data[["LFQ_M_siFKBP8-3"]][i]
+    sd(c(v1,v2,v3))
+    
+  }) |> unlist()) |>
+  ggplot(aes(y = reorder(`Gene names`, -log2FC),
+             x = log2FC, fill="grey", color="#484a4d")) +
+  geom_bar(stat = "identity") +
+  geom_errorbar(aes(xmin = log2FC - sd, xmax = log2FC + sd),
+                width = 0.5, ) +
+  scale_fill_identity() +
+  scale_color_identity() +
+  theme_classic() +
+  theme(axis.title.y = element_blank()) +
+  labs(x = "Log2FC siFKBP8/Ctrl (n=3, Mito), Dataset 6")
 
+# bar_plot
 
-
-
-
-
-
-
-
-
-
-
-
+ggsave("plots_fkbp/bar_plot_siFKBP8.pdf", plot = bar_plot, width = 5, height = 7)
 
