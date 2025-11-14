@@ -37,7 +37,7 @@ combined_plot <- ggplot() +
   theme_classic() +
   geom_abline(slope = 1, intercept = 0, color = "green", linewidth = 1) +
   guides(linetype = guide_legend(override.aes = list(color = "green"))) +
-  geom_point(data = combined_df, #subset(combined_df, FC_22_ev >= 0 & Log2_enrichment_FLAG_EV >= 0), 
+  geom_point(data = combined_df,
              aes(
                x = FC_22_ev,
                y = Log2_enrichment_FLAG_EV,
@@ -46,11 +46,6 @@ combined_plot <- ggplot() +
                )) +
   scale_color_identity() +
   scale_alpha_identity() +
-  # scale_color_manual("Significant Class", values=c(
-  #     "Not Significant" = "grey",
-  #     "Both Datasets" = "darkgreen",
-  #     "One Dataset" = "darkgreen"),
-  #     breaks = c("Both Datasets", "One Dataset", "Not Significant")) +
   geom_text_repel(data = subset(combined_df, annotate), mapping = aes(
     x = FC_22_ev, y = Log2_enrichment_FLAG_EV, color = 'purple',
     label = protein_names),
@@ -71,8 +66,7 @@ combined_plot <- ggplot() +
                      labels = c(seq(-2,12,2), 1.5) |> as.character(), expand = c(0,0)) +
   guides(color = guide_legend(override.aes = list(lty = NA)))
 
-combined_plot
-# plotly::ggplotly(combined_plot)
+# combined_plot
 
 ggsave(plot = combined_plot, filename = "plots2/figure_S1C.pdf", width = 6, height = 6)
 
