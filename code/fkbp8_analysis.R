@@ -8,19 +8,25 @@ library(clusterProfiler) |> suppressMessages()
 ################################ FKBP8 ANALYSIS ################################
 
 # Reading in the data
-fkbp8_kd <- vroom::vroom("./data/ProteinGroups_Mayra-sep2025-revision.txt", show_col_types = FALSE)
+fkbp8_kd <- vroom::vroom("./data/ProteinGroups_Mayra-sep2025-revision.txt", show_col_types = FALSE) |>
+  mutate(p.value_M = 10^(-`-Log10 p-value M-siFKBP8 vs M-NT`),
+         p.value_T = 10^(-`-Log10 p-value T-siFKBP8 vs T-NT`))
 
 # Extracting the necessary columns
 
 data_mito <- fkbp8_kd |>
-  dplyr::select(`Gene names`, `Protein IDs`, contains("M-"), -starts_with("LFQ"), -starts_with("Razor")) |>
-  mutate(sig_bool = `-Log10 p-value M-siFKBP8 vs M-NT` > -log10(0.05))
+  dplyr::select(`Gene names`, `Protein IDs`, p.value_M, contains("M-"), -starts_with("LFQ"), -starts_with("Razor")) |>
+  filter(!is.na(`Log2FC M-siFKBP8 vs M-NT`) & !is.na(`-Log10 p-value M-siFKBP8 vs M-NT`)) |>
+  mutate(p.adj_M = p.adjust(p.value_M, method="fdr"), 
+         sig_bool = p.adj_M < 0.05)
 
 data_total <- fkbp8_kd |>
-  dplyr::select(`Gene names`, `Protein IDs`, contains("T-"), -starts_with("LFQ"), -starts_with("Razor")) |>
-  mutate(sig_bool = `-Log10 p-value T-siFKBP8 vs T-NT` > -log10(0.05))
+  dplyr::select(`Gene names`, `Protein IDs`, p.value_T, contains("T-"), -starts_with("LFQ"), -starts_with("Razor")) |>
+  filter(!is.na(`Log2FC T-siFKBP8 vs T-NT`) & !is.na(`-Log10 p-value T-siFKBP8 vs T-NT`)) |>
+  mutate(p.adj_T = p.adjust(p.value_T, method="fdr"), 
+         sig_bool = p.adj_T < 0.05)
 
-# downloading all annotation
+  # downloading all annotation
 mart <- useMart("ENSEMBL_MART_ENSEMBL", dataset = "hsapiens_gene_ensembl", version = "Ensembl Genes 115")
 uniprots <- Rkeys(org.Hs.egUNIPROT)
 ENSEMBL_ids <- AnnotationDbi::select(org.Hs.eg.db, uniprots, "ENSEMBL", "UNIPROT")
@@ -80,7 +86,8 @@ outlier_thresholds <- data_to_violin |>
 outlier_data <- data_to_violin |>
   left_join(outlier_thresholds, by = "MitoCarta3.0 SubMito Localization") |>
   filter((abs(FC - mean) > 2 * sd & `MitoCarta3.0 SubMito Localization` != 'unknown') |
-           (`Gene names` %in% mito_prot & !is.na(FC)))
+           (`Gene names` %in% mito_prot & !is.na(FC)) |
+           (grepl("TOMM", `Gene names`) & `Gene names` != "TOMM34" & !is.na(FC)))
 
 submito_violin <- ggplot(data = data_to_violin) +
   theme_classic() +
@@ -114,14 +121,14 @@ submito_violin <- ggplot(data = data_to_violin) +
               x = `MitoCarta3.0 SubMito Localization` |> as.factor() |> as.numeric() + 0.1,
               y = FC,
               label = `Gene names`,
-              color = "black"), position = position_dodge(width = 0.1),
+              color = "black"), nudge_x = 0.2,
             show.legend = FALSE, max.overlaps = Inf, min.segment.length = 0) +
   ggrepel::geom_text_repel(data = filter(outlier_data, Batch == "Log2FC M-siFKBP8 vs M-NT"),
                            aes(
                              x = `MitoCarta3.0 SubMito Localization` |> as.factor() |> as.numeric() - 0.1,
                              y = FC,
                              label = `Gene names`,
-                             color = colors),
+                             color = colors), nudge_x = -0.2,
                            show.legend = FALSE, max.overlaps = Inf, min.segment.length = 0) +
   scale_alpha_identity() +
   scale_color_identity() +
@@ -132,7 +139,7 @@ submito_violin <- ggplot(data = data_to_violin) +
 
 submito_violin
 
-ggsave("plots2/split_violin_fkbp8_submito.pdf", plot = submito_violin, width = 10, height = 7)
+ggsave("plots2/split_violin_fkbp8_submito.pdf", plot = submito_violin, width = 10, height = 10)
 
 ################################### BAR PLOT ###################################
 # ONLY FOR MITO WITH HITS from the figure 3d
@@ -307,10 +314,10 @@ ggsave("plots_GO/heatmap_up_TOTAL.pdf", plot = p_go_heat_up_T, width = 15, heigh
 
 # Extracting necessary columns
 data_one_term <- fkbp8_kd |>
-  select(`Protein IDs`, `Gene names`, contains("Log"), starts_with("Sig"), starts_with("q-value")) |>
+  select(`Protein IDs`, `Gene names`, contains("Log"), starts_with("p."), contains("q-value", ignore.case = FALSE)) |>
   mutate(
-    sig_bool_M = `-Log10 p-value M-siFKBP8 vs M-NT` > -log10(0.05) & abs(`Log2FC M-siFKBP8 vs M-NT`) > 1,
-    sig_bool_T = `-Log10 p-value T-siFKBP8 vs T-NT` > -log10(0.05) & abs(`Log2FC T-siFKBP8 vs T-NT`) > 1,
+    sig_bool_M = p.adj_M < 0.05 & abs(`Log2FC M-siFKBP8 vs M-NT`) > 1,
+    sig_bool_T = p.adj_T < 0.05 & abs(`Log2FC T-siFKBP8 vs T-NT`) > 1,
     UNIPROT = gsub(";.*", "", `Protein IDs`),
     UNIPROT = gsub("-.", "", UNIPROT)
   )
@@ -348,27 +355,23 @@ volcano_M <- ggplot() +
   geom_hline(yintercept = -log10(0.05), linetype = 'dashed', color = 'grey') +
   geom_point(data = subset(data_to_plot, Organelles == "Other"), aes(
     x = `Log2FC M-siFKBP8 vs M-NT`,
-    y = `-Log10 p-value M-siFKBP8 vs M-NT`,
+    y = -log10(p.adj_M),
     color = Organelles,
     alpha = transparency_M)) +
   geom_point(data = subset(data_to_plot, Organelles != "Other"), aes(
     x = `Log2FC M-siFKBP8 vs M-NT`,
-    y = `-Log10 p-value M-siFKBP8 vs M-NT`,
+    y = -log10(p.adj_M),
     color = Organelles,
     alpha = transparency_M)) +
   ggrepel::geom_text_repel(data = subset(data_to_plot, sig_bool_M), aes(
     x = `Log2FC M-siFKBP8 vs M-NT`,
-    y = `-Log10 p-value M-siFKBP8 vs M-NT`,
+    y = -log10(p.adj_M),
     color = Organelles,
     label = `Gene names`
   ), show.legend = F, max.overlaps = Inf, verbose = TRUE, min.segment.length = 0) +
   scale_alpha_identity() +
   scale_color_manual("Organelles", values = c(
     'Mitochondrium' = 'darkgreen',
-    # 'Endoplasmatic Reticulum' = 'purple',
-    # 'Golgi aparatus' = 'blue',
-    # 'Lysosome' = 'magenta',
-    # 'Peroxisome' = 'darkgreen',
     'Other' = 'darkgrey'
   ), breaks = c(organelle |> unname(), 'Other'),
   labels = gsub(" ", "\n", c(organelle |> unname(), 'Other'))) +
@@ -379,7 +382,7 @@ volcano_M <- ggplot() +
         legend.background = element_blank()) +
   guides(alpha = 'none')
 
-# volcano_M
+volcano_M
 
 density_M <- data_to_plot |>
   select(`Log2FC M-siFKBP8 vs M-NT`, Organelles) |>
@@ -412,27 +415,23 @@ volcano_T <- ggplot() +
   geom_hline(yintercept = -log10(0.05), linetype = 'dashed', color = 'grey') +
   geom_point(data = subset(data_to_plot, Organelles == "Other"), aes(
     x = `Log2FC T-siFKBP8 vs T-NT`,
-    y = `-Log10 p-value T-siFKBP8 vs T-NT`,
+    y = -log10(p.adj_T),
     color = Organelles,
     alpha = transparency_T)) +
   geom_point(data = subset(data_to_plot, Organelles != "Other"), aes(
     x = `Log2FC T-siFKBP8 vs T-NT`,
-    y = `-Log10 p-value T-siFKBP8 vs T-NT`,
+    y = -log10(p.adj_T),
     color = Organelles,
     alpha = transparency_T)) +
   ggrepel::geom_text_repel(data = subset(data_to_plot, sig_bool_T), aes(
     x = `Log2FC T-siFKBP8 vs T-NT`,
-    y = `-Log10 p-value T-siFKBP8 vs T-NT`,
+    y = -log10(p.adj_T),
     color = Organelles,
     label = `Gene names`
   ), show.legend = F, max.overlaps = Inf, verbose = TRUE, min.segment.length = 0) +
   scale_alpha_identity() +
   scale_color_manual("Organelles", values = c(
     'Mitochondrium' = 'darkgreen',
-    # 'Endoplasmatic Reticulum' = 'purple',
-    # 'Golgi aparatus' = 'blue',
-    # 'Lysosome' = 'magenta',
-    # 'Peroxisome' = 'darkgreen',
     'Other' = 'darkgrey'
   ), breaks = c(organelle |> unname(), 'Other'),
   labels = gsub(" ", "\n", c(organelle |> unname(), 'Other'))) +
@@ -443,7 +442,7 @@ volcano_T <- ggplot() +
         legend.background = element_blank()) +
   guides(alpha = 'none')
 
-# volcano_T
+volcano_T
 # ggsave("plots_GO/volcano_one_term_TOTAL.pdf", plot = volcano_T, height = 7)
 
 density_T <- data_to_plot |>
