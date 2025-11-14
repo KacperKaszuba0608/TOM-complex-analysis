@@ -83,10 +83,10 @@ assign_missing <- function(protein.ids, condition, lfq_intensity) {
   missingness_final$missingness <- apply(missingness_final, 1, function(row) {
     dplyr::case_when(
       (row[2] == "complete" & row[3] == "all_NA") | 
-        (row[3] == "complete" & row[2] == "all_NA") | 
+        (row[3] == "complete" & row[2] == "all_NA") ~ "MNAR",
+      all(row[2:3] == "MAR") | 
         (row[2] == "complete" & row[3] =="MNAR") | 
-        (row[3] == "complete" & row[2] =="MNAR") ~ "MNAR",
-      all(row[2:3] == "MAR") ~ "MAR",
+        (row[3] == "complete" & row[2] =="MNAR") ~ "MAR",
       all(row[2:3] == "complete") ~ "complete",
       TRUE ~ NA
     )
@@ -110,4 +110,25 @@ ttest <- function(df, grp1, grp2){
                    paired = F,
                    na.action=na.omit)
   results$p.value
+}
+
+impute_data <- function(df, col = "LFQ", width = 0.5, downshift = 0.5) {
+  # df = data frame containing filtered 
+  # Assumes missing data (in df) follows a narrowed and downshifted normal distribution
+  
+  # Create new column indicating whether the values are imputed 
+  df$imputed = !is.finite(df[[col]])
+  
+  # Imputation
+  temp <- df[[col]]
+  temp[!is.finite(temp)] = NA #make sure all non-finite values are really NA
+  temp.sd = width * sd(temp, na.rm = TRUE)   # shrink sd width
+  temp.mean = mean(temp, na.rm = TRUE) - 
+    downshift * sd(temp, na.rm = TRUE)   # shift mean of imputed values
+  n.missing = sum(is.na(temp))
+  temp[is.na(temp)] = rnorm(n.missing, mean = temp.mean, sd = temp.sd)
+  
+  df[[col]] <- temp
+  
+  return(df)
 }
