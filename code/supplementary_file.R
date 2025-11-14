@@ -4,6 +4,7 @@ suppressWarnings(source("prepare_the_data.R"))
 # RAW DATA FRAMES
 raw_dataset1 <- read_tsv("./data/raw_dataset1.tsv", show_col_types = FALSE)
 raw_dataset2 <- read.table("./data/raw_dataset2.txt", sep = "\t", header = TRUE, check.names = FALSE)
+fkbp8_dataset <- vroom::vroom("./data/proteinGroups_fkbp8.txt", show_col_types = FALSE)
 
 # COMBINED DATA FRAME
 combined_df <- merge(cleaned_data, dataset2, by.x="dataset2_id", by.y="Protein IDs", all = TRUE) |>
@@ -87,19 +88,24 @@ legend <- data.frame("Table_S1_Datasets" = c(
   Table containing the raw MS data from Msfragger.",
   "(B) Raw Dataset 2. \n
   Table containing the raw MS data from MaxQuant.",
-  "(C) Related to Figures S1C, 2A, 4A, 5B. \n
+  "(C) Raw Dataset 3 \n
+  Table containing the raw MS data from MaxQuant for fkbp8 KD",
+  "(D) Dataset from \u00d6zdemir et al.", 
+  "(E) Related to Figures S1C, 2A, 3B, 4A, 5B. \n
   Data used to plot the figures with information from both dataset and additional databases (MitoCarta3.0, MitoCop, HCOP).",
-  "(D) Related to Figure 5C. \n
+  "(F) Related to Figure 5C. \n
   Data based on the Msfragger file containing log2 fold changes and boost of the crosslinked fold change values.",
-  "(E) Related to Figure S3A. \n
+  "(G) Related to Figure S3A. \n
   Data based on the Msfragger file containing and MitoCop mito-copies information."))
 
 # SUPPLEMENTARY TABLE
 list_of_sheets <- list("Legend" = legend,
                       "(A) Raw Dataset 1" = raw_dataset1,
                       "(B) Raw Dataset 2" = raw_dataset2,
-                      "(C) Combined Dataset" = combined_df,
-                      "(D) Figure 5C dataset" = only_FC,
-                      "(E) Figure S3A dataset" = stochiometric_df)
+                      "(C) Raw Dataset fkbp8" = fkbp8_dataset,
+                      "(D) \u00d6zdemir et al. Dataset" = tom20,
+                      "(E) Combined Dataset" = combined_df,
+                      "(F) Figure 5C dataset" = only_FC,
+                      "(G) Figure S3A dataset" = stochiometric_df)
 
 openxlsx::write.xlsx(list_of_sheets, file = "supplementary_table_2.xlsx", keepNA=TRUE, na.string='NA')
