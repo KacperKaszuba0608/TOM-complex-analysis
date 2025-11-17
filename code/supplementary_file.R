@@ -1,11 +1,12 @@
-suppressWarnings(source("prepare_the_data.R"))
+suppressWarnings(source("./code/prepare_the_data.R"))
 # suppressWarnings(source(choose.files()))
 
 # RAW DATA FRAMES
 raw_dataset1 <- read_tsv("./data/raw_dataset1.tsv", show_col_types = FALSE)
 raw_dataset2 <- read.table("./data/raw_dataset2.txt", sep = "\t", header = TRUE, check.names = FALSE)
-raw_dataset3 <- data.frame()
+raw_dataset3 <- data.frame() # Inserting dataset manually after creating the Excel file
 fkbp8_dataset <- vroom::vroom("./data/proteinGroups_fkbp8.txt", show_col_types = FALSE)
+
 
 # COMBINED DATA FRAME
 combined_df <- merge(cleaned_data, dataset2, by = "UNIPROT", all = TRUE) |>
@@ -93,12 +94,12 @@ only_FC <- only_FC |>
 
 # README
 legend <- data.frame("Table_S1_Datasets" = c(
-  "(A) Related to Figures S1c, 2a, 3b, 4a, S5a.
-  Data used to plot the figures with information from both dataset and additional databases (MitoCarta3.0, MitoCop, HCOP).",
-  "(B) Related to Figure 5. 
+  "(A) Related to Figure 5. 
   Data based on the Msfragger file containing log2 fold changes and boost of the crosslinked fold change values.",
-  "(C) Related to Figure S5b. 
+  "(B) Related to Figure S5b. 
   Data based on the Msfragger file containing and MitoCop mito-copies information.",
+  "(C) Related to Figures S1c, 2a, 3b, 4a, S5a.
+  Data used to plot the figures with information from both dataset and additional databases (MitoCarta3.0, MitoCop, HCOP).",
   "(D) Dataset 1,4. 
   This table contains the mitochondrial isolation data from HEK293T cells obtained from FragPipe.",
   "(E) Dataset 2. 
@@ -113,9 +114,9 @@ legend <- data.frame("Table_S1_Datasets" = c(
 
 # SUPPLEMENTARY TABLE
 list_of_sheets <- list("Legend" = legend,
-                      "(A) Dataset 1+2" = combined_df,
-                      "(B) Figure 5" = only_FC,
-                      "(C) Figure S5b" = stochiometric_df,
+                      "(A) Figure 5" = only_FC,
+                      "(B) Figure S5b" = stochiometric_df,
+                      "(C) Dataset 1+2" = combined_df,
                       "(D) Dataset 1,4" = raw_dataset1,
                       "(E) Dataset 2" = raw_dataset2,
                       "(F) Dataset 3" = raw_dataset3,
