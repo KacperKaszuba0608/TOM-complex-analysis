@@ -1,4 +1,4 @@
-suppressWarnings(source("prepare_the_data.R"))
+suppressWarnings(source("./code/prepare_the_data.R"))
 
 ################################## BASE PLOTS ##################################
 FC.cutoff = 1.5
@@ -114,13 +114,15 @@ average_df$p_allmv <- unlist(sapply(1:nrow(average_df), function(i) {
 
 average_df$p_allmv.adj <- p.adjust(average_df$p_allmv, method = 'BH')
 
+manual_highlight <- c("FKBP8", "MARH5", "TM40L", "TOM70", "PTH2")
+
 average_df <- average_df |>
   mutate(annotate = ifelse(p_allmv < 0.05 & avg_fc > 2 & is_yeast_homolog, TRUE, FALSE),
          transparency = case_when(
            avg_fc > 2 ~ "no_transparent",
            TRUE ~ "transparent"
          ),
-         annotate = ifelse(protein_names %in% c("FKBP8", "MARH5", "TM40L", "TOM70"), TRUE, annotate))
+         annotate = ifelse(protein_names %in% manual_highlight, TRUE, annotate))
 
 average_plot <- average_df |>
   ggplot() +
@@ -131,8 +133,7 @@ average_plot <- average_df |>
     x = avg_fc,
     y = -log10(p_allmv.adj),
     color = colors_class,
-    alpha = ifelse(protein_names == "MARH5", "less_transparent", transparency),
-    label = Gene
+    alpha = ifelse(protein_names %in% manual_highlight, "no_transparent", transparency),
   )) +
   scale_color_manual("", values=c(
     "TOM subunits" = "purple",
@@ -143,7 +144,7 @@ average_plot <- average_df |>
                                     "transparent" = 0.1)) +
   geom_text_repel(data = subset(average_df, annotate), mapping = aes(
     x = avg_fc, y = -log10(p_allmv.adj), color = colors_class, label = protein_names,
-    alpha = ifelse(protein_names == "MARH5", "less_transparent", transparency)),
+    alpha = ifelse(protein_names %in% manual_highlight, "no_transparent", transparency)),
     verbose = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE, point.size = 0.05
   ) + 
   labs(x = "Log2 FC TOMM22-FLAG vs EV (n=6) Dataset 1 + Dataset 2",
@@ -160,7 +161,7 @@ average_plot <- average_df |>
                      labels = c(seq(0, 4, 1), round(-log10(0.05), 2)) |> as.character(), expand = c(0,0)) + 
   guides(alpha = "none")
 
-# average_plot
+average_plot
 
 ggsave(plot = average_plot, filename = "plots2/figure_2A.pdf", width = 8, height = 4)
 
@@ -208,7 +209,6 @@ average_plot_v2 <- average_df |>
   guides(alpha = "none")
 
 # average_plot_v2
-# ggplotly(average_plot_v2)
 
 ggsave(plot = average_plot_v2, filename = "plots2/figure_S2A.pdf", width = 5, height = 4)
 
@@ -249,8 +249,6 @@ average_plot_v3 <- ggplot() +
   scale_alpha_manual("", values = c("no_transparent" = 1, 
                                     "less_transparent" = 0.5,
                                     "high_transparent" = 0.05)) +
-  # scale_size_manual("Half-life (MitoCoP)", values = c(6, 3.5, 2, 3.5),
-  #                   breaks = c("long", "medium", "short")) +
   scale_color_manual("Functional class (MitoCoP)",
                      values = c(
                        "Amino acid metabolism" = "darkgray",
@@ -358,7 +356,6 @@ xlvsnxl_plot_v2 <- ggplot() +
   scale_y_continuous(limits = c(-3, 7.5), expand = c(0,0), breaks = c(seq(-2.5, 7.5, 2.5), 3))
 
 # xlvsnxl_plot_v2
-# ggplotly(xlvsnxl_plot_v2)
 
 xlvsnxl_dens_plot <- ggplot(data = subset(xlvsnxl_DF, `T-test Difference` > 1.5)) +
   theme_classic() +
@@ -443,7 +440,6 @@ boosted_bar_plot <- only_FC_with_mito |>
   guides(fill = "none")
 
 # boosted_bar_plot
-# ggplotly(boosted_bar_plot, tooltip = c("y", "label"))
 
 ggsave(plot = boosted_bar_plot, filename = "plots2/figure_5.pdf", width = 10, height = 15)
 
@@ -535,7 +531,6 @@ stochiometric_plot <- ggplot() +
   scale_y_continuous(limits = c(-3, 8), breaks = seq(-2,8,2))
 
 # stochiometric_plot
-# ggplotly(stochiometric_plot)
 
 ggsave(plot = stochiometric_plot, filename = "plots2/figure_S5B.pdf", width = 7.5, height = 7.5)
 
@@ -611,74 +606,6 @@ crosslinked_volcano <- ggplot() +
 
 ggsave(plot = crosslinked_volcano, filename = "plots2/figure_S5A.pdf", width = 8, height = 4)
 
-############ NEW PLOT Dataset1 VS Dataset 2 colored by Özdemir ################
-
-combined_df <- merge(cleaned_data, dataset2, by.x="dataset2_id", by.y="Protein IDs", all = TRUE) |>
-  mutate(FC_22_ev = ifelse(Log2_enrichment_FLAG_EV > 2 & is.na(FC_22_ev), -5, FC_22_ev),
-         Log2_enrichment_FLAG_EV = ifelse(FC_22_ev > 2 & is.na(Log2_enrichment_FLAG_EV), -5, Log2_enrichment_FLAG_EV),
-         annotate = ifelse(abs(FC_22_ev - Log2_enrichment_FLAG_EV) > 1.5, TRUE, annotate),
-         Gene = ifelse(!is.na(Gene), Gene, Gene_names),
-         protein_names = ifelse(!is.na(protein_names), protein_names, protein_name),
-         pvalue_dataset2 = 10^-Log10_pvalue_FLAG_EV
-  )
-
-df_d1d2 <- combined_df |>
-  select(protein_names, Gene, FC_22_ev, Log2_enrichment_FLAG_EV) |>
-  mutate(Gene_corrected = HGNChelper::checkGeneSymbols(Gene)$Suggested.Symbol)
-
-tom20 <- readxl::read_xlsx("./data/Auswertung PR80 proteingroups.xlsx", sheet = "proteinGroups") |> 
-  select(`Gene names`, `T-test Difference`, `"-Log T-test p-value"`) |>
-  mutate(Gene_corrected = HGNChelper::checkGeneSymbols(`Gene names`)$Suggested.Symbol)
-
-to_plot <- merge(df_d1d2, tom20, by = "Gene_corrected", all.x = TRUE) |>
-  mutate(annotate = FC_22_ev > FC.cutoff & Log2_enrichment_FLAG_EV > FC.cutoff)
-
-# Plot
-major_4_plot <- main_plot +
-  geom_point(data = subset(to_plot, FC_22_ev >= 0 & Log2_enrichment_FLAG_EV >= 0), aes(
-    x = FC_22_ev,
-    y = FC_22_ev_XL,
-    color = `T-test Difference`,
-    shape = ifelse(is.na(`T-test Difference`), 'No', 'Yes'),
-    label = protein_names
-  )) +
-  geom_text_repel(data = subset(to_plot, annotate), mapping = aes(
-    x = FC_22_ev, y = Log2_enrichment_FLAG_EV, color = `T-test Difference`,
-    label = protein_names), point.size = 0.2,
-    verbose = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE
-  ) + 
-  scale_shape_manual("Was detected by\n\u00d6zdemir et al.?", values = c("No" = 1, "Yes" = 16),
-                     breaks = c("Yes", "No")) +
-  scale_color_gradientn("T-test Diffrence\n\u00d6zdemir et al.", 
-                        colors = c("darkgrey", "darkgrey", "orange", "darkgreen"),
-                        values = scales::rescale(c(-2, 0, 2, 4)),
-                        na.value = "darkgrey") +
-  labs(title = "Figure ",
-       x = "Dataset 1 Log2 FC TOMM22-FLAG / EV (n=3)",
-       y = "Dataset 2 Log2 FC TOMM22-FLAG / EV (n=3)") +
-  theme(
-    legend.position = c(.97, .77),
-    legend.justification = c("right", "top"),
-    legend.box.just = "left",
-    legend.spacing.y = unit(0, "cm"),
-    legend.background = element_blank()
-  ) +
-  scale_x_continuous(limits = c(0, 12), breaks = c(0, 2, 4, 6, 8, 10, 12, 1.5), expand = c(0,0)) +
-  scale_y_continuous(limits = c(0, 12), breaks = c(0, 2, 4, 6, 8, 10, 12, 1.5), expand = c(0,0))
-
-major_4_plot
-
-ggsave(plot = major_4_plot, filename = "plots/figure_for_point_major_4.png", width = 6, height = 6)
-ggsave(plot = major_4_plot, filename = "plots/figure_for_point_major_4.pdf", width = 6, height = 6)
-
-
-# List of hits
-# tom20_sig <- tom20 |>
-#   filter(`"-Log T-test p-value"` > -log10(0.05)) |>
-#   filter(!(Gene_corrected %in% df_d1d2$Gene_corrected)) |>
-#   select(`Gene names`, Gene_corrected, `T-test Difference`, `log2 T-test Difference`, `"-Log T-test p-value"`) |>
-#   write.csv("sig_hits_of_Özdemir.csv", row.names = FALSE)
-
 ######################## Pearson Plots ########################
 
 # Plot 1
@@ -751,121 +678,10 @@ pear_plot2 <- df_to_plot2 |>
 
 # pear_plot2
 
-# Plot 3
-# df_to_plot3 <- combined_df |>
-#   filter(FC_22_ev != -5 & Log2_enrichment_FLAG_EV != -5) |>
-#   mutate(group = ifelse(grepl("TOMM", Gene) & Gene != "TOMM34", 'purple', "black"),
-#          transparency = ifelse(FC_22_ev < 0 & Log2_enrichment_FLAG_EV < 0, 0.2, 1))
-# 
-# test3 <- cor.test(~ FC_22_ev + Log2_enrichment_FLAG_EV, df_to_plot3)
-# cor3 <- round(test3$estimate, 2)
-# 
-# pear_plot3 <- df_to_plot3 |>
-#   ggplot(aes(x = Log2_enrichment_FLAG_EV, y = FC_22_ev, color = group, alpha = transparency)) +
-#   geom_abline(slope = 1, intercept = 0, color = "green", linewidth = 1) +
-#   theme_classic() +
-#   geom_point() +
-#   geom_text_repel(aes(label = ifelse(grepl("TOMM", Gene) & Gene != "TOMM34", protein_names, "")),
-#                   verbose = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE) +
-#   scale_color_identity() +
-#   scale_alpha_identity() +
-#   labs(subtitle = paste0("r = ", cor3),
-#        y = "Dataset1 log2 FC TOM22 / EV (n=3)",
-#        x = "Dataset2 log2 FC TOM22 / EV (n=3)") +
-#   ylim(-4, 12) +
-#   xlim(-4, 12)
-
-# pear_plot3
-
 pear_plots <- ggpubr::ggarrange(pear_plot1, pear_plot2, ncol = 2, nrow = 1)
 # pear_plots
 
 ggsave("plots2/pearson_plots.pdf", pear_plots, width = 7, height = 3)
-
-######################## DIGGING #########################
-small_tims <- c("TIM8B", "TIM13", "T10B", "TIM8A")
-
-df_to_digg <- cleaned_data |>
-  merge(mitocarta, by.x = "Simple_ID", by.y = "UniProt", all.x = TRUE) |>
-  mutate(MitoCarta3.0_SubMitoLocalization = case_when(
-           Gene %in% small_tims ~ "IMS",
-           Gene == "TRABD" ~ "MOM",
-           TRUE ~ MitoCarta3.0_SubMitoLocalization
-         )) |>
-  select(protein_names, MitoCarta3.0_SubMitoLocalization, starts_with("FC_"), 
-         starts_with("p_"))
-
-submito_no <- table(df_to_digg$MitoCarta3.0_SubMitoLocalization) |> as.data.frame()
-submito_no_mitocarta <- table(mitocarta$MitoCarta3.0_SubMitoLocalization) |> as.data.frame()
-submito_no <- merge(submito_no, submito_no_mitocarta, by = "Var1", 
-                    suffixes = c("_all", "_mitocarta"), all = TRUE)
-submito_no[is.na(submito_no)] <- 0
-
-calculate_ratio <- function(df, adj = TRUE, save.file = TRUE) {
-  # ratio of non-crosslinked proteins
-  if (adj) {
-    ev_22 <- df_to_digg |>
-      filter(p_22.adj < 0.05 & FC_22_ev > 1.5) # keep only significant proteins
-  } else {
-    ev_22 <- df_to_digg |>
-      filter(p_22 < 0.05 & FC_22_ev > 1.5) # keep only significant proteins
-  }
-  
-  if (nrow(ev_22) > 0) {
-    ev_22 <- table(ev_22$MitoCarta3.0_SubMitoLocalization) |> as.data.frame()
-    
-    ev_22 <- merge(submito_no, ev_22, by = "Var1", suffixes = c("", "_22"), all.x = TRUE) |>
-      mutate(Freq = replace_na(Freq, 0), # replacing NA with 0
-             ratio_22 = round(Freq / Freq_all, 2),
-             ratio_22_mitocarta = round(Freq / Freq_mitocarta, 2)) |> # calculating ratios
-      select(Var1, ratio_22, ratio_22_mitocarta)
-  }
-  
-  # ratio of crosslinked proteins
-  if (adj) {
-    ev_22_xl <- df_to_digg |>
-      filter(p_22_XL.adj < 0.05 & FC_22_ev_XL > 1.5) # keep only significant proteins
-  } else {
-    ev_22_xl <- df_to_digg |>
-      filter(p_22_XL < 0.05 & FC_22_ev_XL > 1.5) # keep only significant proteins
-  }
-  
-  if (nrow(ev_22_xl) > 0) {
-    ev_22_xl <- table(ev_22_xl$MitoCarta3.0_SubMitoLocalization) |> as.data.frame()
-    
-    ev_22_xl <- merge(submito_no, ev_22_xl, by = "Var1", suffixes = c("", "_22xl"), all.x = TRUE) |>
-      mutate(Freq_22xl = replace_na(Freq, 0), # replacing NA with 0
-             ratio_22xl = round(Freq / Freq_all, 2),
-             ratio_22xl_mitocarta = round(Freq / Freq_mitocarta, 2)) |> # calculating ratios
-      select(Var1, ratio_22xl, ratio_22xl_mitocarta)
-  }
-  # export results
-  if (nrow(ev_22) == 0) {
-    ratios <- ev_22_xl
-    colnames(ratios) <- c("MitoCarta3.0_SubMitoLocalization", "ratio 22-xl [%]", "ratio 22-xl [%] (mitocarta)")
-  } else if (nrow(ev_22_xl) == 0) {
-    ratios <- ev_22
-    colnames(ratios) <- c("MitoCarta3.0_SubMitoLocalization", "ratio 22 [%]", "ratio 22 [%] (mitocarta)")
-  } else {
-    ratios <- merge(ev_22, ev_22_xl, by="Var1", all = TRUE)
-    colnames(ratios) <- c("MitoCarta3.0_SubMitoLocalization", "ratio 22 [%]", "ratio 22 [%] (mitocarta)", 
-                          "ratio 22-xl [%]", "ratio 22-xl [%] (mitocarta)")
-  }
-  
-  if (adj) {
-    filename <- paste0("submitolocalization_RATIOS_p_adj.csv")
-  } else {
-    filename <- "submitolocalization_RATIOS.csv"
-  }
-  
-  if (save.file) {write.csv(ratios, filename, row.names = FALSE)}
-}
-
-# Ratios for not adjusted p-values
-calculate_ratio(df_to_digg)
-
-# Ratios for adjusted p-values
-calculate_ratio(df_to_digg, TRUE)
 
 ######################## Venn Diagrams ########################
 
@@ -954,9 +770,87 @@ openxlsx::write.xlsx(merge(table1, table2, by.x = "Gene", by.y = "Gene_corrected
                      file = "digging/protein_in_interest_XL.xlsx",
                      keepNA=TRUE, na.string='NA')
 
-######## Unused Code ########
-gene_names <- c(
-  "TOMM40", "TOMM70", "TOMM5", "TOMM20", "MARCHF5", "VDAC1", "VDAC2", "FKBP8", 
-  "NDKA", "NME2", "AKAP1", "MCL1", "RAB10", "KIF11", "RIF1", "BAX", "ATAD1", 
-  "DARS2", "SYNJ2BP"
-)
+######################## DIGGING #########################
+small_tims <- c("TIM8B", "TIM13", "T10B", "TIM8A")
+
+df_to_digg <- cleaned_data |>
+  merge(mitocarta, by.x = "Simple_ID", by.y = "UniProt", all.x = TRUE) |>
+  mutate(MitoCarta3.0_SubMitoLocalization = case_when(
+    Gene %in% small_tims ~ "IMS",
+    Gene == "TRABD" ~ "MOM",
+    TRUE ~ MitoCarta3.0_SubMitoLocalization
+  )) |>
+  select(protein_names, MitoCarta3.0_SubMitoLocalization, starts_with("FC_"), 
+         starts_with("p_"))
+
+submito_no <- table(df_to_digg$MitoCarta3.0_SubMitoLocalization) |> as.data.frame()
+submito_no_mitocarta <- table(mitocarta$MitoCarta3.0_SubMitoLocalization) |> as.data.frame()
+submito_no <- merge(submito_no, submito_no_mitocarta, by = "Var1", 
+                    suffixes = c("_all", "_mitocarta"), all = TRUE)
+submito_no[is.na(submito_no)] <- 0
+
+calculate_ratio <- function(df, adj = TRUE, save.file = TRUE) {
+  # ratio of non-crosslinked proteins
+  if (adj) {
+    ev_22 <- df_to_digg |>
+      filter(p_22.adj < 0.05 & FC_22_ev > 1.5) # keep only significant proteins
+  } else {
+    ev_22 <- df_to_digg |>
+      filter(p_22 < 0.05 & FC_22_ev > 1.5) # keep only significant proteins
+  }
+  
+  if (nrow(ev_22) > 0) {
+    ev_22 <- table(ev_22$MitoCarta3.0_SubMitoLocalization) |> as.data.frame()
+    
+    ev_22 <- merge(submito_no, ev_22, by = "Var1", suffixes = c("", "_22"), all.x = TRUE) |>
+      mutate(Freq = replace_na(Freq, 0), # replacing NA with 0
+             ratio_22 = round(Freq / Freq_all, 2),
+             ratio_22_mitocarta = round(Freq / Freq_mitocarta, 2)) |> # calculating ratios
+      select(Var1, ratio_22, ratio_22_mitocarta)
+  }
+  
+  # ratio of crosslinked proteins
+  if (adj) {
+    ev_22_xl <- df_to_digg |>
+      filter(p_22_XL.adj < 0.05 & FC_22_ev_XL > 1.5) # keep only significant proteins
+  } else {
+    ev_22_xl <- df_to_digg |>
+      filter(p_22_XL < 0.05 & FC_22_ev_XL > 1.5) # keep only significant proteins
+  }
+  
+  if (nrow(ev_22_xl) > 0) {
+    ev_22_xl <- table(ev_22_xl$MitoCarta3.0_SubMitoLocalization) |> as.data.frame()
+    
+    ev_22_xl <- merge(submito_no, ev_22_xl, by = "Var1", suffixes = c("", "_22xl"), all.x = TRUE) |>
+      mutate(Freq_22xl = replace_na(Freq, 0), # replacing NA with 0
+             ratio_22xl = round(Freq / Freq_all, 2),
+             ratio_22xl_mitocarta = round(Freq / Freq_mitocarta, 2)) |> # calculating ratios
+      select(Var1, ratio_22xl, ratio_22xl_mitocarta)
+  }
+  # export results
+  if (nrow(ev_22) == 0) {
+    ratios <- ev_22_xl
+    colnames(ratios) <- c("MitoCarta3.0_SubMitoLocalization", "ratio 22-xl [%]", "ratio 22-xl [%] (mitocarta)")
+  } else if (nrow(ev_22_xl) == 0) {
+    ratios <- ev_22
+    colnames(ratios) <- c("MitoCarta3.0_SubMitoLocalization", "ratio 22 [%]", "ratio 22 [%] (mitocarta)")
+  } else {
+    ratios <- merge(ev_22, ev_22_xl, by="Var1", all = TRUE)
+    colnames(ratios) <- c("MitoCarta3.0_SubMitoLocalization", "ratio 22 [%]", "ratio 22 [%] (mitocarta)", 
+                          "ratio 22-xl [%]", "ratio 22-xl [%] (mitocarta)")
+  }
+  
+  if (adj) {
+    filename <- paste0("submitolocalization_RATIOS_p_adj.csv")
+  } else {
+    filename <- "submitolocalization_RATIOS.csv"
+  }
+  
+  if (save.file) {write.csv(ratios, filename, row.names = FALSE)}
+}
+
+# Ratios for not adjusted p-values
+calculate_ratio(df_to_digg)
+
+# Ratios for adjusted p-values
+calculate_ratio(df_to_digg, TRUE)
