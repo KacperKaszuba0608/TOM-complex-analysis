@@ -249,47 +249,56 @@ to_volcano_M <- mitocarta |>
                               match_fun = str_detect) 
 
 to_volcano_M <- to_volcano_M |>
-  mutate(annotate = ifelse(p.value < 0.05 & abs(log2FC) > 1 | # p.adj p.value
+  mutate(annotate = ifelse(p.adj < 0.05 & abs(log2FC) > 1 | # p.adj p.value
                              `Gene names` == "FKBP8" |
-                             grepl("TOMM", `Gene names`) & `Gene names` != "TOMM34", TRUE, FALSE))
+                             grepl("TOMM", `Gene names`) & `Gene names` != "TOMM34", TRUE, FALSE),
+         transparency = ifelse(p.adj < 0.05, 1, 0.2),
+         MitoCarta3.0_List = ifelse(is.na(MitoCarta3.0_List), "Other", "Mitochondrial proteins"))
 
 volcano_M <- to_volcano_M |>
   ggplot() +
   theme_classic() +
   geom_hline(yintercept = -log10(0.05), linetype="dashed", color="black", alpha=0.4) +
   geom_vline(xintercept = c(-1,1), linetype="dashed", color="black", alpha=0.4) +
-  geom_point(data = subset(to_volcano_M, is.na(MitoCarta3.0_List)), 
+  geom_point(data = subset(to_volcano_M, MitoCarta3.0_List != "Mitochondrial proteins"), 
              aes(
                x = log2FC, 
-               # y = -log10(p.value),
-               y = -log10(p.adj),
-               color = MitoCarta3.0_List, #MitoCarta3.0_List, #missingness_ours,
-               shape = imputed)) +
-  geom_point(data = subset(to_volcano_M, !is.na(MitoCarta3.0_List)), 
+               y = -log10(p.value),
+               alpha = transparency,
+               color = MitoCarta3.0_List, #MitoCarta3.0_List, #missingness_ours
+               )) +
+  geom_point(data = subset(to_volcano_M, MitoCarta3.0_List == "Mitochondrial proteins"), 
              aes(
                x = log2FC, 
-               # y = -log10(p.value), 
-               y = -log10(p.adj),
+               y = -log10(p.value),
+               alpha = transparency,
                color = MitoCarta3.0_List, #MitoCarta3.0_List, #missingness_ours,
-               shape = imputed)) +
+               )) +
   ggrepel::geom_text_repel(data = subset(to_volcano_M, annotate), 
                            aes(
                              x = log2FC,
-                             # y = -log10(p.value),
-                             y = -log10(p.adj),
+                             y = -log10(p.value),
                              color = MitoCarta3.0_List, #MitoCarta3.0_List, #missingness_ours,
                              label = `Gene names`
                            ),
                            inherit.aes = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE) +
-  scale_color_manual("", values=c("MitoCarta3.0" = "darkgreen", "NA" = "darkgrey")) +
-  scale_shape_manual("Imputed", values = c("TRUE"=1, "FALSE"=16)) +
-  # labs(subtitle = "Labeled p.adj < 0.05, FKBP8 and TOMs")
-  labs(subtitle = "Labeled p.value < 0.05, FKBP8 and TOMs")
+  scale_color_manual("", values=c("Mitochondrial proteins" = "darkgreen", "Other" = "darkgrey"),
+                     labels = c("Mitochondrial\nproteins", "Other")) +
+  scale_alpha_identity() +
+  labs(x = "Log2FC siFKBP8 (n=3) Dataset 6",
+       y = "-Log10 p-value") +
+  theme(
+    legend.position = c(0.35, 1),
+    legend.justification = c("right", "top"),
+    legend.text.position = "right",
+    legend.key.size = unit(0.3, "cm"),
+    legend.background = element_blank()
+  ) +
+  guides(alpha="none")
 
-volcano_M
+# volcano_M
 
-# ggsave("./plots_fkbp/volcano_M_v1.pdf", plot=volcano_M)
-ggsave("./plots_fkbp/volcano_M_v2.pdf", plot=volcano_M)
+ggsave("./plots_fkbp/volcano_M.pdf", plot=volcano_M, width = 3.6, height = 3.4)
 
 # Volcano TOTAL
 lfq_T.to_plot <- lfq_T.to_plot |>
@@ -300,47 +309,54 @@ to_volcano_T <- mitocarta |>
                               match_fun = str_detect)
 
 to_volcano_T <- to_volcano_T |>
-  mutate(annotate = ifelse(p.value < 0.05 & abs(log2FC) > 1 | # p.adj p.value
+  mutate(annotate = ifelse(p.adj < 0.05 & abs(log2FC) > 1 | # p.adj p.value
                              `Gene names` == "FKBP8" |
-                             grepl("TOMM", `Gene names`) & `Gene names` != "TOMM34", TRUE, FALSE))
+                             grepl("TOMM", `Gene names`) & `Gene names` != "TOMM34", TRUE, FALSE),
+         transparency = ifelse(p.adj < 0.05, 1, 0.2),
+         MitoCarta3.0_List = ifelse(is.na(MitoCarta3.0_List), "Other", "Mitochondrial proteins"))
 
 volcano_T <- to_volcano_T |>
   ggplot() +
   theme_classic() +
   geom_hline(yintercept = -log10(0.05), linetype="dashed", color="black", alpha=0.4) +
   geom_vline(xintercept = c(-1,1), linetype="dashed", color="black", alpha=0.4) +
-  geom_point(data = subset(to_volcano_T, is.na(MitoCarta3.0_List)), 
+  geom_point(data = subset(to_volcano_T, MitoCarta3.0_List != "Mitochondrial proteins"), 
              aes(
                x = log2FC, 
-               # y = -log10(p.value),
-               y = -log10(p.adj),
+               y = -log10(p.value),
                color = MitoCarta3.0_List, #MitoCarta3.0_List, #missingness_ours,
-               shape = imputed)) +
-  geom_point(data = subset(to_volcano_T, !is.na(MitoCarta3.0_List)), 
+               alpha = transparency)) +
+  geom_point(data = subset(to_volcano_T, MitoCarta3.0_List == "Mitochondrial proteins"), 
              aes(
                x = log2FC, 
-               # y = -log10(p.value),
-               y = -log10(p.adj),
+               y = -log10(p.value),
                color = MitoCarta3.0_List, #MitoCarta3.0_List, #missingness_ours,
-               shape = imputed)) +
+               alpha = transparency)) +
   ggrepel::geom_text_repel(data = subset(to_volcano_T, annotate), 
                            aes(
                              x = log2FC,
-                             # y = -log10(p.value),
-                             y = -log10(p.adj),
+                             y = -log10(p.value),
                              color = MitoCarta3.0_List, #MitoCarta3.0_List, #missingness_ours,
                              label = `Gene names`
                            ),
                            inherit.aes = TRUE, max.overlaps = Inf, min.segment.length = 0, show.legend = FALSE) +
-  scale_color_manual("", values=c("MitoCarta3.0" = "darkgreen", "NA" = "darkgrey")) +
-  scale_shape_manual("Imputed", values = c("TRUE"=1, "FALSE"=16)) +
-  # labs(subtitle = "Labeled p.adj < 0.05, FKBP8 and TOMs")
-  labs(subtitle = "Labeled p.value < 0.05, FKBP8 and TOMs")
+  scale_color_manual("", values=c("Mitochondrial proteins" = "darkgreen", "Other" = "darkgrey"),
+                     labels = c("Mitochondrial\nproteins", "Other")) +
+  scale_alpha_identity() +
+  labs(x = "Log2FC siFKBP8 (n=3) Dataset t",
+       y = "-Log10 p-value") +
+  theme(
+    legend.position = c(0.35, 1),
+    legend.justification = c("right", "top"),
+    legend.text.position = "right",
+    legend.key.size = unit(0.3, "cm"),
+    legend.background = element_blank()
+  ) +
+  guides(alpha="none")
 
-volcano_T
+# volcano_T
 
-# ggsave("./plots_fkbp/volcano_T_v1.pdf", plot=volcano_T)
-ggsave("./plots_fkbp/volcano_T_v2.pdf", plot=volcano_T)
+ggsave("./plots_fkbp/volcano_T.pdf", plot=volcano_T, width = 3.6, height = 3.4)
 
 ################################ SUBMITO VIOLIN ################################
 data_to_violin <- merge(lfq_M.to_plot |> select(`Protein IDs`, `Gene names`, log2FC), 
