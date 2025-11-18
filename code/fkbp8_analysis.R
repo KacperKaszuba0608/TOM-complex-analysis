@@ -1,6 +1,7 @@
+library(org.Hs.eg.db) |> suppressMessages()
 library(tidyverse)
 library(protti)
-source("fxn.R")
+source("./code/fxn.R")
 
 # Seed for reproducibility
 set.seed(123)
@@ -463,6 +464,80 @@ submito_violin <- ggplot() +
 # submito_violin
 
 ggsave("plots_fkbp//split_violin_fkbp8_submito.pdf", plot = submito_violin, width = 10, height = 10)
+
+############################## ORGANELLES VIOLIN ###############################
+data_to_violin <- merge(lfq_M.to_plot |> dplyr::select(`Protein IDs`, `Gene names`, log2FC), 
+                       lfq_T.to_plot |> dplyr::select(`Protein IDs`, `Gene names`, log2FC), 
+                       by = c("Protein IDs", "Gene names"), all = TRUE, suffixes = c("_M", "_T"))
+
+# Creating a vector of needed GO terms and map vector
+this.GO.mito <- "GO:0005739" # Mitochondrium
+this.GO.ER <- "GO:0005783" # ER
+GO.terms <- c(this.GO.mito, this.GO.ER)
+organelle <- c("Mitochondrium", "ER")
+names(organelle) <- GO.terms
+
+# Retrieving all possible UNIPROT IDs for our GO terms
+retrieved <- AnnotationDbi::select(org.Hs.eg.db, keytype = "GOALL", 
+                                   keys = GO.terms, 
+                                   columns = c("ENSEMBL", "UNIPROT")) |>
+  dplyr::select(UNIPROT, GOALL) |>
+  mutate(Organelles = organelle[GOALL]) |> # mapping the GO IDs with the names
+  distinct(UNIPROT, Organelles) |> # Removing noise
+  group_by(UNIPROT) |>
+  mutate(Organelles = paste(Organelles, collapse = " | ")) |> # Collapsing more than 1 organelle
+  ungroup()
+
+# Merging with our original dataset
+data_to_violin <- data_to_violin |>
+  mutate(UNIPROT = gsub(";.*", "", `Protein IDs`),
+         UNIPROT = gsub("-.*", "", UNIPROT))
+
+data_to_violin <- merge(data_to_violin, retrieved, by = "UNIPROT", all.x = TRUE) |>
+  mutate(Organelles = replace_na(Organelles, "Other")) |>
+  distinct()
+
+# Check if NA still exist
+is.na(data_to_violin$Organelles) |> sum() == 0
+
+data_to_violin <- data_to_violin |>
+  mutate(colors = case_when(
+    Organelles == "Mitochondrium" ~ "darkgreen",
+    Organelles == "ER" ~ "#8151A0",
+    Organelles == "Mitochondrium | ER" ~ "#3954A4",
+    TRUE ~ "darkgrey"
+  ))
+
+data_to_plot <- data_to_violin |>
+  pivot_longer(cols = c(log2FC_M, log2FC_T), names_to = "Batch", values_to = "FC")
+
+# Plotting
+org_violin <- ggplot() +
+  theme_classic() +
+  geom_abline(intercept = 0, slope = 0, linetype = "dashed", color = "darkgrey") +
+  annotate("rect", ymin = -1, ymax = 1, xmin = -Inf, xmax = Inf, fill = "grey", alpha = 0.5) +
+  gghalves::geom_half_violin(data = data_to_plot,
+                             aes(
+                               x = Organelles,
+                               y = FC,
+                               split = Batch,
+                               fill = colors,
+                               colour = ifelse(Batch == "log2FC_M", colors, 'black'),
+                               alpha = ifelse(Batch == "log2FC_M", 0.5, 1)
+                             ),
+                             position = "identity", draw_quantiles = 0.5, show.legend = FALSE) +
+  scale_alpha_identity() +
+  scale_color_identity() +
+  scale_fill_identity() +
+  coord_flip() +
+  geom_text(aes(x = 4.12, y = 1.1, label = "Cell Lysates (Dataset 5)", color="#484a4d"), hjust=0) +
+  geom_text(aes(x = 3.88, y = 1.1, label = "Mito (Dataset 6)", color="#484a4d"), alpha = 0.5, hjust=0) +
+  theme(axis.title.y = element_blank()) +
+  labs(y = "log2FC siFKBP8/NT (n=3), Dataset 5 and Dataset 6")
+
+org_violin
+
+ggsave("plots_fkbp/split_violin_fkbp8_organelles.pdf", plot = org_violin, width = 6, height = 5)
 
 ################################### BAR PLOT ###################################
 # ONLY FOR MITO WITH HITS from the figure 3d
