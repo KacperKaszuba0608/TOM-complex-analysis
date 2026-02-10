@@ -6,12 +6,12 @@ Data analysis and visualization for an article:
 * ## A dynamic gateway: uncovering the expanded human TOM complex interactome and its regulatory complexity 
 * ## The Dynamic Network of the Human TOM Complex.
 
-**Authors:**
+**Authors:** <br>
 Mayra A. Borrero-Landazabal $^{1}$†, Vanessa Linke $^{1}$†‡, Tereza Kadavá $^{2,3}$, Zeshi Li $^{4}$, Piotr Draczkowski $^{5,6}$, <br>
 Kacper Kaszuba $^{1}$, Lea Bertgen $^{1}$, Remigiusz A. Serwa $^{1}$, Albert J. R. Heck $^{2,3}$\*, Agnieszka Chacinska $^{1}$\*
 
 
-**Affiliations:** 
+**Affiliations:** <br>
 $^1$ IMol Polish Academy of Sciences, Warsaw, Poland. <br>
 $^2$ Biomolecular Mass Spectrometry and Proteomics, Bijvoet Center for Biomolecular Research and Utrecht Institute for Pharmaceutical Sciences, University of Utrecht, Padualaan 8, Utrecht 3584 CH, the Netherlands. <br>
 $^3$ Netherlands Proteomics Center, Padualaan 8, Utrecht 3584 CH, the Netherlands. <br>
