@@ -3,38 +3,42 @@
 # TOM-complex-analysis
 Data analysis and visualization for an article:
 
-## A large-scale map of transient and constituive interactor of human TOM comple enabled by crosslinking
+* ## A dynamic gateway: uncovering the expanded human TOM complex interactome and its regulatory complexity 
+* ## The Dynamic Network of the Human TOM Complex.
 
-Mayra A. Borrero-Landazabal $^{1,6}$, Vanessa Linke $^{1,6}$, Tereza Kadavá $^{2}$, Zeshi Li $^{3}$, Piotr Draczkowski $^{4,5}$, <br>
-Kacper Kaszuba $^{1}$, Remigiusz Serwa $^{1}$, Albert J. R. Heck $^{2*}$, Agnieszka Chacińska $^{1*}$
+**Authors:**
+Mayra A. Borrero-Landazabal $^{1}$†, Vanessa Linke $^{1}$†‡, Tereza Kadavá $^{2,3}$, Zeshi Li $^{4}$, Piotr Draczkowski $^{5,6}$, <br>
+Kacper Kaszuba $^{1}$, Lea Bertgen $^{1}$, Remigiusz A. Serwa $^{1}$, Albert J. R. Heck $^{2,3}$\*, Agnieszka Chacinska $^{1}$\*
 
-$^1$ IMol Polish Academy of Sciences, Warsaw, Poland <br>
-$^2$ Biomolecular Mass Spectrometry and Proteomics, Bijvoet Center for Biomolecular 
-Research and Utrecht Institute for Pharmaceutical Sciences, University of Utrecht, 
-Padualaan 8, Utrecht 3584 CH, the Netherlands <br>
-$^3$ Chemical Biology & Drug Discovery, Utrecht Institute for Pharmaceutical Sciences,
- University of Utrecht, Padualaan 8, Utrecht 3584 CH, the Netherlands <br>
-$^4$ Department of Biochemistry and Biophysics, National Bioinformatics Infrastructure 
-Sweden, Science for Life Laboratory, Stockholm University, Solna, Sweden <br>
-$^5$ Department of Synthesis and Chemical Technology of Pharmaceutical Substances, 
-Medical University of Lublin, Lublin, Poland <br>
-$^6$ These authors contributed equally: Mayra A. Borrero-Landazabal, Vanessa Linke <br>
-*Corresponding authors: Albert J. R. Heck (a.j.r.heck@uu.nl); Agnieszka Chacinska (a.chacinska@imol.institute)
+
+**Affiliations:** 
+$^1$ IMol Polish Academy of Sciences, Warsaw, Poland. <br>
+$^2$ Biomolecular Mass Spectrometry and Proteomics, Bijvoet Center for Biomolecular Research and Utrecht Institute for Pharmaceutical Sciences, University of Utrecht, Padualaan 8, Utrecht 3584 CH, the Netherlands. <br>
+$^3$ Netherlands Proteomics Center, Padualaan 8, Utrecht 3584 CH, the Netherlands. <br>
+$^4$ Chemical Biology & Drug Discovery, Utrecht Institute for Pharmaceutical Sciences, Utrecht University, Universiteitsweg 99, Utrecht 3584 CG, the Netherlands. <br>
+$^5$ Department of Biochemistry and Biophysics, National Bioinformatics Infrastructure Sweden, Science for Life Laboratory, Stockholm University, Solna, Sweden. <br>
+$^6$ Department of Synthesis and Chemical Technology of Pharmaceutical Substances, Medical University of Lublin, Lublin, Poland. <br>
+\* Corresponding authors: a.j.r.heck@uu.nl (Albert J. R. Heck ); a.chacinska@imol.institute (Agnieszka Chacinska ) <br>
+† These authors contributed equally. <br>
+‡ Present address: Mass Spectrometry Facility, IN-MOL-CELL Infrastructure, International Institute of Molecular and Cell Biology in Warsaw, 02‑109, Warsaw, Poland
 
 ## Abstract
 
-The core architecture of the translocase of the outer mitochondrial membrane (TOM) that
-serves as the central entry gate for nuclear-encoded proteins is evolutionarily conserved from
-yeast to human. Here, we define the interactome of the human TOM complex that deals with a
-vastly more complex environment. Encouraged by substantial overlap with known yeast
-homologs, we expanded the interactome to include transient and labile interactors stabilized by 
-a&nbsp;membrane-permeable crosslinker. Mapping of 24 unique inter-protein crosslinks to TOM core
-subunits provided structural insight into interaction interfaces. Crosslinking further enhanced
-recovery of peripheral components such as the receptor TOMM70 and several TOM-associated
-quality control factors, including ATAD1, the human homolog of Msp1, recently found to prevent
-complex clogging. We also mapped novel human TOM interactors, including FKBP8, an
-immunophilin linked to mitophagy and apoptosis. Our findings provide the basis to uncover
-human-specific regulatory mechanisms behind the complex human mitochondrial network.
+The translocase of the outer mitochondrial membrane (TOM) is the conserved entry 
+gate for nuclear-encoded proteins. While structurally similar from yeast to humans, 
+the human TOM complex operates in a cellular environment of vastly greater complexity. 
+Here, we present a high-confidence map of the human TOM interactome using a membrane-permeable
+crosslinker to capture both stable and transient interactors. Excitingly, alongside 
+extensive overlap with known yeast partners, we uncover a set of human-specific 
+interactors including regulatory factors and newly identified TOM-associated proteins. 
+Mapping unique inter-protein crosslinks reveals conformational flexibility of 
+the receptor TOM20 and enhanced recovery of peripheral components such as TOM70 
+and several associated quality control factors. Notably, we identify FKBP8 as a 
+novel human-specific interactor that binds multiple TOM subunits and promotes 
+organization of the complex. Our work redefines the human TOM complex as a dynamic, 
+multifaceted hub coordinating biogenesis, quality control, and signaling. This 
+expanded TOM landscape offers a rich resource for exploring mitochondrial regulation 
+in health and disease.
 
 # Content 📁
 
@@ -44,6 +48,8 @@ human-specific regulatory mechanisms behind the complex human mitochondrial netw
 │
 └───code
         analysis.Rmd
+        fkbp8_analysis.R
+        fxn.R
         plotting.R
         prepare_the_data.R
         supplementary_file.R
@@ -57,9 +63,15 @@ This repository contains the code used to analyze the mass spectrometry data for
     - Subsequent to this step is the imputation of relative proteins.
     - The third step is the calculation of the fold change.
     - The final step is the conducting of a t-test.
-2) The **`prepare_the_data.R`** is utilized for the preparation of the results from *1)* to generate the plots that are included in the article.
-3) The **`plotting.R`** is utilized for the purpose of generating a plot.
-4) The **`supplementary_file.R`** combines all of the utilized datasets into a single Excel file.
+2) The **`fkbp8_analysis.R`** is utilized for the analysis of the FKBP8 protein, which includes the following steps:
+    - The initial step involves the cleansing of missing data.
+    - Subsequent to this step is the imputation of relative proteins.
+    - The third step is the calculation of the fold change.
+    - The final step is the conducting of a t-test.
+3) The **`fxn.R`** contains the functions that are utilized in the **`fkbp8_analysis.R`** file.
+4) The **`plotting.R`** is utilized for the purpose of generating a plot.
+5) The **`prepare_the_data.R`** is utilized for the preparation of the results from *1)* to generate the plots that are included in the article.
+6) The **`supplementary_file.R`** combines all of the utilized datasets into a single Excel file.
 
 # Code authors 🖥️
 
