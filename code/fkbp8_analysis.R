@@ -1,4 +1,4 @@
-library(org.Hs.eg.db) |> suppressMessages()
+library(org.Hs.eg.db) |> suppressPackageStartupMessages()
 library(tidyverse)
 library(protti)
 source("./code/fxn.R")
@@ -7,11 +7,11 @@ source("./code/fxn.R")
 set.seed(123)
 
 # Load the data
-mitocarta <- vroom::vroom("./data/Human.MitoCarta3.0.csv", show_col_types = FALSE) |>
+mitocarta <- vroom::vroom("G:/My Drive/common_data/Human.MitoCarta3.0.csv", show_col_types = FALSE) |>
   select(UniProt, MitoCarta3.0_List, MitoCarta3.0_SubMitoLocalization) |>
   filter(UniProt != 0)
 
-fkbp8_raw <- vroom::vroom("./data/proteinGroups_fkbp8.txt", show_col_types = FALSE) |>
+fkbp8_raw <- vroom::vroom("G:/My Drive/tom_analysis/data/proteinGroups_fkbp8.txt", show_col_types = FALSE) |>
   filter(is.na(`Only identified by site`),
          is.na(Reverse),
          is.na(`Potential contaminant`))
@@ -211,6 +211,7 @@ lfq_M.to_plot <- lfq_M.to_plot |>
   select(-missingness_protti)
 
 lfq_M.to_plot <- merge(lfq_M.to_plot, metadata[c("Protein IDs", "Gene names")], by = "Protein IDs", all.x = TRUE)
+write.csv(lfq_M.to_plot, "G:/My Drive/tom_analysis/data/processed/lfq_M.to_plot.csv", row.names = FALSE)
 
 # Fold change TOTAL
 colnames(imputed_TOTAL)[8] <- "LFQ"
@@ -239,6 +240,7 @@ lfq_T.to_plot <- lfq_T.to_plot |>
   select(-missingness_protti)
 
 lfq_T.to_plot <- merge(lfq_T.to_plot, metadata[c("Protein IDs", "Gene names")], by = "Protein IDs", all.x = TRUE)
+write.csv(lfq_T.to_plot, "G:/My Drive/tom_analysis/data/processed/lfq_T.to_plot.csv", row.names = FALSE)
 
 ################################### PLOTTING ###################################
 # Volcano MITO
